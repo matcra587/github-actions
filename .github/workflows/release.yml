@@ -31,8 +31,9 @@ jobs:
     name: Release actions
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
+    environment: deploy
     permissions:
-      contents: write # Create the GitHub release and immutable version tag.
+      contents: read # App token (minted below) handles the privileged tag/release create.
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -65,7 +66,10 @@ jobs:
             const path = require('path');
             const pkg = JSON.parse(
               fs.readFileSync(
-                path.join(process.env.GITHUB_WORKSPACE, 'package.json'),
+                path.join(
+                  process.env.GITHUB_WORKSPACE,
+                  'packages/homebrew-publish-formula/package.json',
+                ),
                 'utf8',
               ),
             );
@@ -74,7 +78,15 @@ jobs:
               core.setFailed(`package.json version must be SemVer (got: ${version})`);
               return;
             }
-            return `v${version}`;
+            return `homebrew/v${version}`;
+
+      - name: Generate App token
+        id: app-token
+        uses: actions/create-github-app-token@1b10c78c7865c340bc4f6099eb2f838309f1e8c3 # v3.1.1
+        with:
+          app-id: ${{ secrets.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
 
       - name: Create release
         run: |
@@ -118,7 +130,7 @@ jobs:
         shell: bash
         env:
           DRAFT: ${{ inputs.draft }}
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
           PRERELEASE: ${{ inputs.prerelease }}
           RELEASE_NOTES: ${{ inputs.notes }}
           VERSION: ${{ steps.version.outputs.result }}
