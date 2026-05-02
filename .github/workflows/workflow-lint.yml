@@ -1,0 +1,140 @@
+---
+name: workflow-lint
+
+on:
+  workflow_call:
+    inputs:
+      actionlint:
+        description: Run actionlint.
+        type: boolean
+        default: true
+      zizmor:
+        description: Run zizmor.
+        type: boolean
+        default: true
+      actionlint-version:
+        description: actionlint version installed by mise.
+        type: string
+        default: "1.7.12"
+      mise-version:
+        description: mise version used to install actionlint.
+        type: string
+        default: "2026.4.28"
+      actionlint-args:
+        description: Newline-separated arguments passed to actionlint.
+        type: string
+        default: |-
+          -color
+      zizmor-inputs:
+        description: Paths passed to zizmor.
+        type: string
+        default: ./.github/
+      zizmor-version:
+        description: zizmor version installed by zizmor-action.
+        type: string
+        default: "1.24.1"
+      zizmor-online-audits:
+        description: Run zizmor online audits.
+        type: boolean
+        default: true
+      zizmor-persona:
+        description: Zizmor persona.
+        type: string
+        default: pedantic
+      zizmor-min-severity:
+        description: Minimum zizmor severity to report.
+        type: string
+        default: ""
+      zizmor-min-confidence:
+        description: Minimum zizmor confidence to report.
+        type: string
+        default: ""
+      zizmor-advanced-security:
+        description: Upload SARIF to GitHub Advanced Security.
+        type: boolean
+        default: true
+      zizmor-annotations:
+        description: Emit workflow annotations.
+        type: boolean
+        default: false
+      zizmor-color:
+        description: Emit colorized zizmor CLI output.
+        type: boolean
+        default: true
+      zizmor-config:
+        description: Optional zizmor configuration path.
+        type: string
+        default: ""
+      zizmor-fail-on-no-inputs:
+        description: Fail if zizmor cannot collect any inputs.
+        type: boolean
+        default: true
+
+permissions: {}
+
+jobs:
+  actionlint:
+    name: ActionLint
+    if: inputs.actionlint
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Install mise
+        uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151 # v4.0.1
+        with:
+          version: ${{ inputs.mise-version }}
+          github_token: ${{ github.token }}
+          mise_toml: |
+            [tools]
+            actionlint = "${{ inputs.actionlint-version }}"
+
+      - name: Run actionlint
+        run: |
+          set -euo pipefail
+          args=()
+          while IFS= read -r arg; do
+            if [ -n "${arg}" ]; then
+              args+=("${arg}")
+            fi
+          done <<< "${ACTIONLINT_ARGS}"
+          actionlint "${args[@]}"
+        shell: bash
+        env:
+          ACTIONLINT_ARGS: ${{ inputs.actionlint-args }}
+
+  zizmor:
+    name: Zizmor workflow security
+    if: inputs.zizmor
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write # Upload zizmor SARIF results.
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Run zizmor
+        uses: zizmorcore/zizmor-action@b1d7e1fb5de872772f31590499237e7cce841e8e # v0.5.3
+        with:
+          inputs: ${{ inputs.zizmor-inputs }}
+          online-audits: ${{ inputs.zizmor-online-audits }}
+          persona: ${{ inputs.zizmor-persona }}
+          min-severity: ${{ inputs.zizmor-min-severity }}
+          min-confidence: ${{ inputs.zizmor-min-confidence }}
+          version: ${{ inputs.zizmor-version }}
+          token: ${{ github.token }}
+          advanced-security: ${{ inputs.zizmor-advanced-security }}
+          annotations: ${{ inputs.zizmor-annotations }}
+          color: ${{ inputs.zizmor-color }}
+          config: ${{ inputs.zizmor-config }}
+          fail-on-no-inputs: ${{ inputs.zizmor-fail-on-no-inputs }}

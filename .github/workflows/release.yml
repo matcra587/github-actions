@@ -1,0 +1,124 @@
+---
+name: release
+
+on:
+  workflow_dispatch:
+    inputs:
+      draft:
+        description: Create the GitHub release as a draft.
+        required: false
+        type: boolean
+        default: false
+      prerelease:
+        description: Mark the GitHub release as a prerelease.
+        required: false
+        type: boolean
+        default: false
+      notes:
+        description: Optional release notes.
+        required: false
+        type: string
+        default: ""
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  release:
+    name: Release actions
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: write # Create the GitHub release and immutable version tag.
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install mise
+        uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151 # v4.0.1
+        with:
+          version: 2026.4.28
+          github_token: ${{ github.token }}
+
+      - name: Install dependencies
+        run: bun ci
+
+      - name: Run checks
+        run: bun run all
+
+      - name: Ensure bundled actions are committed
+        run: git diff --exit-code -- packages/homebrew-publish-formula/dist/index.js
+
+      - name: Read version from package.json
+        id: version
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          result-encoding: string
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            const pkg = JSON.parse(
+              fs.readFileSync(
+                path.join(process.env.GITHUB_WORKSPACE, 'package.json'),
+                'utf8',
+              ),
+            );
+            const version = pkg.version;
+            if (!/^\d+\.\d+\.\d+(-[0-9A-Za-z][0-9A-Za-z.-]*)?$/.test(version)) {
+              core.setFailed(`package.json version must be SemVer (got: ${version})`);
+              return;
+            }
+            return `v${version}`;
+
+      - name: Create release
+        run: |
+          set -euo pipefail
+
+          git fetch --tags --force
+          if git rev-parse --quiet --verify "refs/tags/${VERSION}" >/dev/null; then
+            echo "tag ${VERSION} already exists" >&2
+            exit 1
+          fi
+          if gh release view "${VERSION}" >/dev/null 2>&1; then
+            echo "release ${VERSION} already exists" >&2
+            exit 1
+          fi
+
+          {
+            if [ -n "${RELEASE_NOTES}" ]; then
+              printf "%s\n\n" "${RELEASE_NOTES}"
+            else
+              printf "Release %s.\n\n" "${VERSION}"
+            fi
+            printf "Reviewed commit: %s\n\n" "${GITHUB_SHA}"
+            printf "Consumers should pin actions and reusable workflows to this commit SHA.\n"
+          } > release-notes.md
+
+          args=(
+            release create "${VERSION}"
+            --target "${GITHUB_SHA}"
+            --title "${VERSION}"
+            --notes-file release-notes.md
+          )
+
+          if [ "${DRAFT}" = "true" ]; then
+            args+=(--draft)
+          fi
+          if [ "${PRERELEASE}" = "true" ]; then
+            args+=(--prerelease)
+          fi
+
+          gh "${args[@]}"
+        shell: bash
+        env:
+          DRAFT: ${{ inputs.draft }}
+          GH_TOKEN: ${{ github.token }}
+          PRERELEASE: ${{ inputs.prerelease }}
+          RELEASE_NOTES: ${{ inputs.notes }}
+          VERSION: ${{ steps.version.outputs.result }}

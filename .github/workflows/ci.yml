@@ -1,0 +1,40 @@
+---
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: TypeScript checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Install mise
+        uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151 # v4.0.1
+        with:
+          version: 2026.4.28
+          github_token: ${{ github.token }}
+
+      - name: Install dependencies
+        run: bun ci
+
+      - name: Run checks
+        run: bun run all
+
+      - name: Ensure bundled action is committed
+        run: git diff --exit-code -- packages/homebrew-publish-formula/dist/index.js
