@@ -1,0 +1,27 @@
+# Dependencies and package-manager caches.
+node_modules/
+**/node_modules/
+.bun/
+.cache/
+.npm/
+.pnpm-store/
+.rumdl_cache/
+.yarn/
+
+# Local environment files. Keep examples tracked.
+.env
+.env.*
+**/.env
+**/.env.*
+!.env.example
+!**/.env.example
+
+# Test and build scratch output. Do not ignore package dist/ bundles.
+coverage/
+**/coverage/
+*.tsbuildinfo
+*.heapsnapshot
+
+# OS/editor noise.
+.DS_Store
+*.log
