@@ -1,0 +1,22 @@
+{
+  "name": "@matcra587/homebrew-publish-formula-action",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "all": "bun run typecheck && bun run test && bun run bundle && bun run check-dist",
+    "bundle": "bun build src/index.ts --target=node --format=esm --outfile=dist/index.js",
+    "check-dist": "node --check dist/index.js",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@actions/core": "3.0.1",
+    "@actions/github": "9.1.1"
+  },
+  "devDependencies": {
+    "@types/bun": "1.3.13",
+    "@types/node": "25.6.0",
+    "typescript": "6.0.3"
+  }
+}

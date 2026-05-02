@@ -1,0 +1,106 @@
+name: Publish Homebrew formula
+description: Render and publish a Homebrew formula for GoReleaser archives.
+
+inputs:
+  token:
+    description: GitHub token with write access to the tap repository.
+    required: true
+  tap:
+    description: Tap repository in owner/name form.
+    required: true
+  name:
+    description: Formula and default binary name.
+    required: true
+  class:
+    description: Ruby formula class. Defaults to PascalCase of name.
+    required: false
+  desc:
+    description: Formula description.
+    required: true
+  homepage:
+    description: Project homepage URL.
+    required: true
+  version:
+    description: Release version, with or without a leading v.
+    required: true
+  license:
+    description: Formula license.
+    required: false
+    default: MIT
+  checksums-file:
+    description: Path to GoReleaser checksums.txt.
+    required: false
+    default: dist/checksums.txt
+  platforms:
+    description: Comma or newline separated os/arch list.
+    required: false
+    default: |-
+      darwin/arm64
+      linux/amd64
+      linux/arm64
+  archive-name-template:
+    description: Archive filename template. Supports {name}, {version}, {os}, and {arch}.
+    required: false
+    default: "{name}_{version}_{os}_{arch}.tar.gz"
+  binary-name:
+    description: Installed binary name. Defaults to name.
+    required: false
+  module-path:
+    description: Go module path for HEAD ldflags.
+    required: false
+  build-package:
+    description: Package path used for HEAD builds.
+    required: false
+    default: "."
+  head-url:
+    description: HEAD source URL. Defaults to {homepage}.git.
+    required: false
+  head-branch:
+    description: HEAD source branch.
+    required: false
+    default: main
+  head-depends-on:
+    description: Build dependency used by the HEAD stanza. Leave empty to omit.
+    required: false
+    default: go
+  completion-args:
+    description: Comma or newline separated args for generate_completions_from_executable. Empty disables completions.
+    required: false
+    default: completion
+  test-args:
+    description: Arguments passed to the installed binary in the formula test block.
+    required: false
+    default: version
+  test-match:
+    description: Expected test output. Use {version} to assert the formula version.
+    required: false
+    default: "{version}"
+  livecheck:
+    description: Add a GitHub latest livecheck block.
+    required: false
+    default: "true"
+  branch:
+    description: Tap branch to update. Defaults to the tap repository default branch.
+    required: false
+  commit-message:
+    description: Commit message. Supports {name} and {version}.
+    required: false
+    default: "{name}: v{version}"
+  dry-run:
+    description: Render the formula without publishing it.
+    required: false
+    default: "false"
+
+outputs:
+  formula-path:
+    description: Path updated in the tap repository.
+  commit-sha:
+    description: Commit SHA returned by GitHub when publishing.
+
+runs:
+  using: node24
+  main: dist/index.js
+
+branding:
+  icon: package
+  color: blue
