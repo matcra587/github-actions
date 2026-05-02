@@ -50,13 +50,13 @@ on:
         type: string
         default: ""
       zizmor-advanced-security:
-        description: Upload SARIF to GitHub Advanced Security.
+        description: Upload SARIF to GitHub Advanced Security. GHAS code scanning is free for public repositories but a paid feature for private repos, so this defaults to false; callers should pass true on public repos.
         type: boolean
-        default: true
+        default: false
       zizmor-annotations:
         description: Emit workflow annotations.
         type: boolean
-        default: false
+        default: true
       zizmor-color:
         description: Emit colorized zizmor CLI output.
         type: boolean
