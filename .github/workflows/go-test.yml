@@ -1,0 +1,91 @@
+---
+name: go-test
+
+on:
+  workflow_call:
+    inputs:
+      go-version:
+        description: Go toolchain version.
+        type: string
+        default: "1.26"
+      test-args:
+        description: Arguments passed to `go test`.
+        type: string
+        default: "-v -race -cover ./..."
+      vet:
+        description: Run `go vet ./...`.
+        type: boolean
+        default: true
+      govulncheck:
+        description: Run `go tool govulncheck ./...`. Consumer must include govulncheck in its go.mod tools block.
+        type: boolean
+        default: true
+      dependency-review:
+        description: Run actions/dependency-review-action. PR-only.
+        type: boolean
+        default: false
+      dependency-review-fail-on-severity:
+        description: Severity threshold passed to dependency-review.
+        type: string
+        default: high
+
+permissions: {}
+
+jobs:
+  test:
+    name: Go build & test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+        with:
+          go-version: ${{ inputs.go-version }}
+          cache: true
+
+      - name: Download deps
+        run: go mod download
+
+      - name: Build
+        run: go build ./...
+
+      - name: Test
+        run: |
+          read -ra args <<< "${TEST_ARGS}"
+          go test "${args[@]}"
+        shell: bash
+        env:
+          TEST_ARGS: ${{ inputs.test-args }}
+
+      - name: Vet
+        if: inputs.vet
+        run: go vet ./...
+
+      - name: Security check
+        if: inputs.govulncheck
+        run: go tool govulncheck ./...
+
+  dependency-review:
+    name: Dependency review
+    if: inputs.dependency-review && github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Dependency review
+        uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4.9.0
+        with:
+          fail-on-severity: ${{ inputs.dependency-review-fail-on-severity }}
