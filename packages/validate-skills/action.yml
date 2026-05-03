@@ -6,6 +6,10 @@ inputs:
     description: Root directory to scan.
     required: false
     default: .
+  validators:
+    description: Comma-separated subset of validators to run. Use `all` (default) for the full pipeline, or any of `frontmatter`, `agentskills`, `marketplace` (singly or comma-separated) to scope the run — useful when calling the action as multiple named steps.
+    required: false
+    default: all
 
 outputs:
   error-count:

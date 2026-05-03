@@ -23806,10 +23806,6 @@ var require_public_api = __commonJS((exports) => {
   exports.stringify = stringify;
 });
 
-// src/main.ts
-import { existsSync as existsSync3 } from "node:fs";
-import { relative, resolve as resolve2 } from "node:path";
-
 // ../../node_modules/@actions/core/lib/command.js
 import * as os from "os";
 
@@ -24453,6 +24449,10 @@ function endGroup() {
   issue("endgroup");
 }
 
+// src/main.ts
+import { existsSync as existsSync3 } from "node:fs";
+import { relative, resolve as resolve2 } from "node:path";
+
 // src/discover.ts
 import { readdir as readdir2 } from "node:fs/promises";
 import { basename, join } from "node:path";
@@ -24981,14 +24981,42 @@ async function validateMarketplace(rootPath, discovery, marketplace = null) {
 }
 
 // src/main.ts
-async function main() {
+var ALL_VALIDATORS = new Set([
+  "frontmatter",
+  "agentskills",
+  "marketplace"
+]);
+function parseValidators(input) {
+  const trimmed = input.trim().toLowerCase();
+  if (trimmed === "" || trimmed === "all")
+    return ALL_VALIDATORS;
+  const requested = new Set;
+  for (const raw of trimmed.split(",")) {
+    const name = raw.trim();
+    if (name === "frontmatter" || name === "agentskills" || name === "marketplace") {
+      requested.add(name);
+    } else {
+      throw new Error(`Unknown validator "${name}". Allowed: frontmatter, agentskills, marketplace, all.`);
+    }
+  }
+  return requested;
+}
+async function run() {
   const inputPath = getInput("path") || ".";
   const root = resolve2(inputPath);
   if (!existsSync3(root)) {
     setFailed(`Path "${root}" does not exist`);
     return;
   }
-  info(`validate-skills scanning ${root}`);
+  let active;
+  try {
+    active = parseValidators(getInput("validators") || "all");
+  } catch (err) {
+    setFailed(err instanceof Error ? err.message : String(err));
+    return;
+  }
+  const scope = active.size === ALL_VALIDATORS.size ? "all" : [...active].join(",");
+  info(`validate-skills scanning ${root} (validators: ${scope})`);
   const discovery = await discover(root);
   const skillFiles = discovery.frontmatter.filter((f) => f.type === "skill");
   const agentFiles = discovery.frontmatter.filter((f) => f.type === "agent");
@@ -25004,33 +25032,39 @@ async function main() {
   const rel = (p) => relative(root, p);
   const marketplaceShape = discovery.marketplace ? await readMarketplace(discovery.marketplace.path) : null;
   const marketplaceEntryCount = marketplaceShape?.entries.length ?? 0;
-  startGroup(`Frontmatter validator (${discovery.frontmatter.length} files)`);
-  info(`Rules: ${describeRules("frontmatter/")}`);
-  for (const file of discovery.frontmatter) {
-    info(`  ✓ ${rel(file.path)} [${file.type}]`);
-    issues.push(...await validateFrontmatter(file));
-  }
-  endGroup();
-  startGroup(`agentskills.io spec validator (${skillFiles.length} skills)`);
-  info(`Rules: ${describeRules("agentskills/")}`);
-  for (const file of skillFiles) {
-    info(`  ✓ ${rel(file.path)}`);
-    issues.push(...await validateAgentskills(file));
-  }
-  endGroup();
-  if (discovery.marketplace && marketplaceShape) {
-    startGroup(`Marketplace consistency validator (${marketplaceEntryCount} entries, ${discovery.pluginManifests.length} plugin manifests)`);
-    info(`Rules: ${describeRules("marketplace/")}, ${describeRules("plugin-manifest/")}`);
-    for (const entry of marketplaceShape.entries) {
-      const name = typeof entry.name === "string" ? entry.name : "?";
-      const source = typeof entry.source === "string" ? entry.source : "?";
-      info(`  ✓ ${name} → ${source}`);
+  if (active.has("frontmatter")) {
+    startGroup(`Frontmatter validator (${discovery.frontmatter.length} files)`);
+    info(`Rules: ${describeRules("frontmatter/")}`);
+    for (const file of discovery.frontmatter) {
+      info(`  ✓ ${rel(file.path)} [${file.type}]`);
+      issues.push(...await validateFrontmatter(file));
     }
-    issues.push(...await validateMarketplace(root, discovery, marketplaceShape));
     endGroup();
-  } else {
-    info("Marketplace consistency validator: no marketplace.json found — skipping");
-    issues.push(...await validateMarketplace(root, discovery, null));
+  }
+  if (active.has("agentskills")) {
+    startGroup(`agentskills.io spec validator (${skillFiles.length} skills)`);
+    info(`Rules: ${describeRules("agentskills/")}`);
+    for (const file of skillFiles) {
+      info(`  ✓ ${rel(file.path)}`);
+      issues.push(...await validateAgentskills(file));
+    }
+    endGroup();
+  }
+  if (active.has("marketplace")) {
+    if (discovery.marketplace && marketplaceShape) {
+      startGroup(`Marketplace consistency validator (${marketplaceEntryCount} entries, ${discovery.pluginManifests.length} plugin manifests)`);
+      info(`Rules: ${describeRules("marketplace/")}, ${describeRules("plugin-manifest/")}`);
+      for (const entry of marketplaceShape.entries) {
+        const name = typeof entry.name === "string" ? entry.name : "?";
+        const source = typeof entry.source === "string" ? entry.source : "?";
+        info(`  ✓ ${name} → ${source}`);
+      }
+      issues.push(...await validateMarketplace(root, discovery, marketplaceShape));
+      endGroup();
+    } else {
+      info("Marketplace consistency validator: no marketplace.json found — skipping");
+      issues.push(...await validateMarketplace(root, discovery, null));
+    }
   }
   for (const issue2 of issues) {
     const props = {
@@ -25047,17 +25081,33 @@ async function main() {
   const warningCount = issues.filter((i) => i.level === "warning").length;
   setOutput("error-count", errorCount);
   setOutput("warning-count", warningCount);
-  info(`Checked: ${discovery.frontmatter.length} frontmatter files, ${skillFiles.length} agentskills checks, ${marketplaceEntryCount} marketplace entries, ${discovery.pluginManifests.length} plugin manifests. ${errorCount} error(s), ${warningCount} warning(s).`);
+  const tallyParts = [];
+  if (active.has("frontmatter")) {
+    tallyParts.push(`${discovery.frontmatter.length} frontmatter files`);
+  }
+  if (active.has("agentskills")) {
+    tallyParts.push(`${skillFiles.length} agentskills checks`);
+  }
+  if (active.has("marketplace")) {
+    tallyParts.push(`${marketplaceEntryCount} marketplace entries, ${discovery.pluginManifests.length} plugin manifests`);
+  }
+  info(`Checked: ${tallyParts.join(", ")}. ${errorCount} error(s), ${warningCount} warning(s).`);
   if (errorCount === 0 && warningCount === 0) {
     info("✓ All checks passed");
   }
-  const summary2 = summary.addHeading("validate-skills report", 2).addHeading("What was checked", 3).addList([
-    `${skillFiles.length} skills (frontmatter + agentskills.io spec)`,
-    `${agentFiles.length} agents (frontmatter)`,
-    `${commandFiles.length} commands (frontmatter)`,
-    `${discovery.pluginManifests.length} plugin manifests (unsupported-fields check)`,
-    `${discovery.marketplace ? `marketplace.json — ${marketplaceEntryCount} entries — checked structure, required fields, source paths, duplicates, orphans` : "no marketplace.json (skipped marketplace checks)"}`
-  ]).addHeading("Results", 3).addRaw(`Errors: **${errorCount}**, Warnings: **${warningCount}**`).addBreak();
+  const checkedItems = [];
+  if (active.has("frontmatter")) {
+    checkedItems.push(`${discovery.frontmatter.length} markdown files (frontmatter): ${skillFiles.length} skills, ${agentFiles.length} agents, ${commandFiles.length} commands`);
+  }
+  if (active.has("agentskills")) {
+    checkedItems.push(`${skillFiles.length} skills (agentskills.io spec)`);
+  }
+  if (active.has("marketplace")) {
+    checkedItems.push(`${discovery.pluginManifests.length} plugin manifests (unsupported-fields check)`);
+    checkedItems.push(discovery.marketplace ? `marketplace.json — ${marketplaceEntryCount} entries — checked structure, required fields, source paths, duplicates, orphans` : "no marketplace.json (skipped marketplace checks)");
+  }
+  const reportTitle = active.size === ALL_VALIDATORS.size ? "validate-skills report" : `validate-skills report (${[...active].join(", ")})`;
+  const summary2 = summary.addHeading(reportTitle, 2).addHeading("What was checked", 3).addList(checkedItems).addHeading("Results", 3).addRaw(`Errors: **${errorCount}**, Warnings: **${warningCount}**`).addBreak();
   if (issues.length > 0) {
     summary2.addTable([
       [
@@ -25071,14 +25121,15 @@ async function main() {
   } else {
     summary2.addRaw("All checks passed.").addBreak();
   }
-  await summary2.write();
+  if (process.env.GITHUB_STEP_SUMMARY) {
+    await summary2.write();
+  }
   if (errorCount > 0) {
     setFailed(`${errorCount} validation error(s)`);
   }
 }
 
 // src/index.ts
-main().catch((err) => {
-  console.error("Fatal error:", err);
-  process.exit(2);
+run().catch((error2) => {
+  setFailed(error2 instanceof Error ? error2.message : String(error2));
 });

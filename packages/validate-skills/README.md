@@ -29,6 +29,8 @@ GitHub Action that validates Claude Code skills, agents, commands, and the marke
 
 ## Usage
 
+### Single invocation (runs all validators)
+
 ```yaml
 name: Validate Skills
 on:
@@ -42,15 +44,39 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: matcra587/github-actions/packages/validate-skills@<sha>
-        # or, when developing in mattc-plugins:
-        # - uses: ./packages/validate-skills
+```
+
+### Per-validator named steps (per-step pass/fail in PR Checks UI)
+
+```yaml
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Validate frontmatter
+        uses: matcra587/github-actions/packages/validate-skills@<sha>
+        with:
+          validators: frontmatter
+
+      - name: Validate agentskills.io spec
+        uses: matcra587/github-actions/packages/validate-skills@<sha>
+        with:
+          validators: agentskills
+
+      - name: Validate marketplace consistency
+        uses: matcra587/github-actions/packages/validate-skills@<sha>
+        with:
+          validators: marketplace
 ```
 
 ## Inputs
 
-| Input  | Default | Purpose                |
-|--------|---------|------------------------|
-| `path` | `.`     | Root directory to scan |
+| Input        | Default | Purpose                                                                                          |
+|--------------|---------|--------------------------------------------------------------------------------------------------|
+| `path`       | `.`     | Root directory to scan.                                                                          |
+| `validators` | `all`   | Comma-separated subset of `frontmatter`, `agentskills`, `marketplace` — or `all` for the lot.    |
 
 ## Outputs
 
