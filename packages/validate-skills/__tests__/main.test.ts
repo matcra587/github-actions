@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import * as core from '@actions/core'
-import { main } from '@validate-skills/main'
+import { run } from '@validate-skills/main'
 
 let tempDir: string
 let outputFile: string
@@ -51,7 +51,7 @@ describe('main integration', () => {
       'marketplace',
       'good',
     )
-    await main()
+    await run()
     const output = readFileSync(outputFile, 'utf-8')
     expect(output).toContain('error-count')
     expect(output).toMatch(/error-count<<.*\n0\n/)
@@ -65,14 +65,14 @@ describe('main integration', () => {
       'marketplace',
       'triggers-broken-source',
     )
-    await main()
+    await run()
     const output = readFileSync(outputFile, 'utf-8')
     expect(output).toMatch(/error-count<<.*\n[1-9]/)
   })
 
   test('non-existent path emits failure', async () => {
     process.env.INPUT_PATH = join(tempDir, 'does-not-exist')
-    await main()
+    await run()
     // core.setFailed records a failure but does not throw; in a test
     // context process.exitCode is set to 1.
     expect(process.exitCode).toBe(1)

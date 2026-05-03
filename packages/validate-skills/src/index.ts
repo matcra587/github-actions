@@ -1,7 +1,6 @@
-import { main } from '@validate-skills/main'
+import * as core from '@actions/core'
+import { run } from '@validate-skills/main'
 
-main().catch((err) => {
-  // eslint-disable-next-line no-console
-  console.error('Fatal error:', err)
-  process.exit(2)
+run().catch((error) => {
+  core.setFailed(error instanceof Error ? error.message : String(error))
 })
