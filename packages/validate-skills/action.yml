@@ -1,0 +1,22 @@
+name: Validate Skills
+description: Validate Claude Code skills, agents, commands, and marketplace.json against frontmatter rules, agentskills.io spec, and marketplace catalogue consistency.
+
+inputs:
+  path:
+    description: Root directory to scan.
+    required: false
+    default: .
+
+outputs:
+  error-count:
+    description: Total errors found.
+  warning-count:
+    description: Total warnings found.
+
+runs:
+  using: node24
+  main: dist/index.js
+
+branding:
+  icon: check-circle
+  color: green

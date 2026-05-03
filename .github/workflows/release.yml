@@ -4,6 +4,13 @@ name: release
 on:
   workflow_dispatch:
     inputs:
+      package:
+        description: Which package to release.
+        required: true
+        type: choice
+        options:
+          - homebrew-publish-formula
+          - validate-skills
       draft:
         description: Create the GitHub release as a draft.
         required: false
@@ -54,21 +61,31 @@ jobs:
         run: bun run all
 
       - name: Ensure bundled actions are committed
-        run: git diff --exit-code -- packages/homebrew-publish-formula/dist/index.js
+        run: git diff --exit-code -- "packages/${PACKAGE}/dist/index.js"
+        env:
+          PACKAGE: ${{ inputs.package }}
 
       - name: Read version from package.json
         id: version
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          PACKAGE: ${{ inputs.package }}
         with:
           result-encoding: string
           script: |
             const fs = require('fs');
             const path = require('path');
+            const packageDir = process.env.PACKAGE;
+            // Tag prefix mapping: short alias for homebrew-publish-formula
+            // (backward-compat with existing tags), package dir name otherwise.
+            const tagPrefix = packageDir === 'homebrew-publish-formula'
+              ? 'homebrew'
+              : packageDir;
             const pkg = JSON.parse(
               fs.readFileSync(
                 path.join(
                   process.env.GITHUB_WORKSPACE,
-                  'packages/homebrew-publish-formula/package.json',
+                  `packages/${packageDir}/package.json`,
                 ),
                 'utf8',
               ),
@@ -78,7 +95,7 @@ jobs:
               core.setFailed(`package.json version must be SemVer (got: ${version})`);
               return;
             }
-            return `homebrew/v${version}`;
+            return `${tagPrefix}/v${version}`;
 
       - name: Generate App token
         id: app-token

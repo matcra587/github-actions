@@ -44,6 +44,27 @@ updates:
         patterns:
           - "*"
 
+  - package-ecosystem: bun
+    directory: /packages/validate-skills
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    labels:
+      - dependencies
+    commit-message:
+      prefix: deps
+      include: scope
+    cooldown:
+      default-days: 7
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - version-update:semver-major
+    groups:
+      validate-skills:
+        patterns:
+          - "*"
+
   - package-ecosystem: github-actions
     directory: /
     schedule:
