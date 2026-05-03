@@ -11,6 +11,10 @@ Shared GitHub Actions for `matcra587` repositories.
 
 *   [`homebrew-publish-formula`](packages/homebrew-publish-formula/README.md) —
   Render and publish a Homebrew formula from GoReleaser archives.
+*   [`validate-skills`](packages/validate-skills/README.md) —
+  Validate Claude Code skills, agents, commands, and the marketplace
+  catalogue (frontmatter, agentskills.io spec, marketplace consistency).
+  Supports per-validator scoping for named-step CI workflows.
 
 ## Reusable Workflows
 
@@ -62,6 +66,7 @@ This repo uses Bun for development and Node for published action runtime.
 bun install
 bun run all
 bun run homebrew:local
+bun run validate-skills:local
 ```
 
 Each action lives under `packages/<action-name>`. Add future actions, such
