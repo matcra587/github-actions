@@ -1,0 +1,6 @@
+{
+  "plugins": [
+    { "name": "x", "description": "a", "source": "./skills/x" },
+    { "name": "x", "description": "b", "source": "./skills/x" }
+  ]
+}

@@ -7,12 +7,17 @@
     "packages/*"
   ],
   "scripts": {
-    "all": "bun run quality && bun run homebrew:all",
+    "all": "bun run quality && bun run homebrew:all && bun run validate-skills:all",
     "homebrew:all": "cd packages/homebrew-publish-formula && bun run all",
     "homebrew:bundle": "cd packages/homebrew-publish-formula && bun run bundle",
     "homebrew:local": "ROOT=$PWD; cd packages/homebrew-publish-formula && PATH=\"$ROOT/node_modules/.bin:$PATH\" local-action . src/main.ts .env.example",
     "homebrew:test": "cd packages/homebrew-publish-formula && bun run test",
     "homebrew:typecheck": "cd packages/homebrew-publish-formula && bun run typecheck",
+    "validate-skills:all": "cd packages/validate-skills && bun run all",
+    "validate-skills:bundle": "cd packages/validate-skills && bun run bundle",
+    "validate-skills:local": "ROOT=$PWD; cd packages/validate-skills && PATH=\"$ROOT/node_modules/.bin:$PATH\" local-action . src/main.ts .env.example",
+    "validate-skills:test": "cd packages/validate-skills && bun run test",
+    "validate-skills:typecheck": "cd packages/validate-skills && bun run typecheck",
     "quality": "biome ci .",
     "quality:fix": "biome check --write ."
   },

@@ -1,0 +1,5 @@
+{
+  "plugins": [
+    { "name": "ghost", "description": "x", "source": "./does-not-exist" }
+  ]
+}

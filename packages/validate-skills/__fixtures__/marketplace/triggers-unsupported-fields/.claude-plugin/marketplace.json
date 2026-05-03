@@ -1,0 +1,3 @@
+{
+  "plugins": [{ "name": "bad", "description": "x", "source": "./plugins/bad" }]
+}

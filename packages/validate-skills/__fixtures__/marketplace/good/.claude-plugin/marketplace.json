@@ -1,0 +1,19 @@
+{
+  "name": "test",
+  "plugins": [
+    {
+      "name": "sample-skill",
+      "description": "x",
+      "source": "./skills/sample-skill",
+      "category": "test",
+      "homepage": "https://example.com"
+    },
+    {
+      "name": "sample-plugin",
+      "description": "x",
+      "source": "./plugins/sample-plugin",
+      "category": "test",
+      "homepage": "https://example.com"
+    }
+  ]
+}
