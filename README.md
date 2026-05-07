@@ -34,15 +34,17 @@ jobs:
     uses: matcra587/github-actions/.github/workflows/workflow-lint.yml@<reviewed-commit-sha>
     permissions:
       contents: read
-      security-events: write
     with:
       actionlint-args: |-
         -color
       zizmor-inputs: ./.github/
       zizmor-persona: pedantic
       zizmor-version: "1.24.1"
-      zizmor-advanced-security: true
+      zizmor-advanced-security: false
 ```
+
+Set `zizmor-advanced-security: true` and add `security-events: write` to the
+caller job permissions only when uploading SARIF to code scanning.
 
 ## Releases
 

@@ -1,0 +1,6 @@
+# workflow-lint.yml intentionally inherits caller permissions so SARIF upload
+# can be enabled without requiring security-events for annotation-only callers.
+rules:
+  excessive-permissions:
+    ignore:
+      - workflow-lint.yml
