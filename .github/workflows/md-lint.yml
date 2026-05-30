@@ -25,6 +25,6 @@ jobs:
           persist-credentials: false
 
       - name: Run rumdl
-        uses: rvben/rumdl@50f402f7aa90089dc8ce30765371fc5537946268 # v0.1.86
+        uses: rvben/rumdl@d9e57d93efd2c85a2b4efa1f597652fe017e464a # v0.2.0
         with:
           report-type: ${{ inputs.report-type }}
