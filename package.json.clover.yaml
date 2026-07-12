@@ -1,0 +1,5 @@
+# Sidecar for package.json (strict JSON cannot host a directive).
+# The packageManager field follows the bun pin in .mise.toml.
+- from: bun
+  jq: .packageManager
+  tags: bun
