@@ -105,7 +105,7 @@ jobs:
       - name: Await gates for tagged commit
         if: steps.release-state.outputs.exists != 'true' && inputs.gates != ''
         # clover: provider=github repository=matcra587/github-actions tags=actions
-        uses: matcra587/github-actions/packages/await-gates@c0216a58eba899bc76f83f21a5760ffddb443035 # zizmor: ignore[stale-action-refs] repin to await-gates/v0.1.0 once tagged
+        uses: matcra587/github-actions/packages/await-gates@0d4d0ac90375afc54cae61ea6023cdb1da4aa5a3 # tag=await-gates/v0.1.0
         with:
           gates: ${{ inputs.gates }}
 
