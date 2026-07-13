@@ -25,3 +25,8 @@ coverage/
 # OS/editor noise.
 .DS_Store
 *.log
+
+# Package dist bundles are the shipped action code; re-include them even
+# when a contributor's global ignore excludes dist/.
+!packages/*/dist/
+!packages/*/dist/**
