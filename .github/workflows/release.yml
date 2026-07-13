@@ -9,6 +9,7 @@ on:
         required: true
         type: choice
         options:
+          - await-gates
           - homebrew-publish-formula
           - validate-skills
       draft:

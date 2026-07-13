@@ -1,0 +1,50 @@
+name: await-gates
+description: >-
+  Wait for named workflow gates to complete successfully for a commit before
+  proceeding. Fails fast on a failed gate, and fails with guidance when no
+  gate run exists (only pushed branch tips get push-event runs).
+author: matcra587
+
+inputs:
+  gates:
+    description: >-
+      Whitespace-separated workflow file names (e.g. "test.yml lint.yml")
+      that must each have a successful push-event run for the commit. Each
+      named workflow is a gate.
+    required: true
+  ref:
+    description: Git ref or SHA to await gates for. Defaults to the triggering ref.
+    required: false
+    default: ${{ github.ref_name }}
+  repository:
+    description: Repository (owner/name) the gates run in.
+    required: false
+    default: ${{ github.repository }}
+  token:
+    description: Token used to read workflow runs (needs actions:read).
+    required: false
+    default: ${{ github.token }}
+  deadline-seconds:
+    description: Overall time budget for all gates.
+    required: false
+    default: "900"
+  grace-seconds:
+    description: How long to wait for a gate's run to appear before failing.
+    required: false
+    default: "180"
+  poll-seconds:
+    description: Interval between polls.
+    required: false
+    default: "15"
+
+outputs:
+  sha:
+    description: The commit SHA the gates were verified against.
+
+runs:
+  using: node24
+  main: dist/index.js
+
+branding:
+  icon: check-circle
+  color: green

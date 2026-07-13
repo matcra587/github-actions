@@ -7,7 +7,12 @@
     "packages/*"
   ],
   "scripts": {
-    "all": "bun run quality && bun run homebrew:all && bun run validate-skills:all",
+    "all": "bun run quality && bun run await-gates:all && bun run homebrew:all && bun run validate-skills:all",
+    "await-gates:all": "cd packages/await-gates && bun run all",
+    "await-gates:bundle": "cd packages/await-gates && bun run bundle",
+    "await-gates:local": "ROOT=$PWD; cd packages/await-gates && PATH=\"$ROOT/node_modules/.bin:$PATH\" local-action . src/main.ts .env.example",
+    "await-gates:test": "cd packages/await-gates && bun run test",
+    "await-gates:typecheck": "cd packages/await-gates && bun run typecheck",
     "homebrew:all": "cd packages/homebrew-publish-formula && bun run all",
     "homebrew:bundle": "cd packages/homebrew-publish-formula && bun run bundle",
     "homebrew:local": "ROOT=$PWD; cd packages/homebrew-publish-formula && PATH=\"$ROOT/node_modules/.bin:$PATH\" local-action . src/main.ts .env.example",

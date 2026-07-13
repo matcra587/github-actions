@@ -9,6 +9,9 @@ Shared GitHub Actions for `matcra587` repositories.
 
 ## Actions
 
+*   [`await-gates`](packages/await-gates/README.md) —
+  Wait for named workflow gates to pass for a commit (composite; used by
+  release workflows to gate tag publishes on the tagged commit's CI).
 *   [`homebrew-publish-formula`](packages/homebrew-publish-formula/README.md) —
   Render and publish a Homebrew formula from GoReleaser archives.
 *   [`validate-skills`](packages/validate-skills/README.md) —
