@@ -2,21 +2,21 @@
 # clover: provider=auto constraint=minor tags=actionlint
 actionlint = "1.7.12"
 # clover: provider=github id=biome repository=biomejs/biome constraint=minor tag-prefix=@biomejs/biome@ tags=biome
-biome = "2.4.14"
+biome = "2.5.4"
 # clover: provider=auto id=bun constraint=minor tags=bun
-bun = "1.3.13"
+bun = "1.3.14"
 # clover: provider=auto id=hk constraint=minor tags=hk
-hk = "1.44.3"
+hk = "1.51.0"
 # clover: provider=auto constraint=minor tags=node
-node = "24.15.0"
+node = "26.5.0"
 # clover: provider=auto constraint=minor tags=pkl
-pkl = "0.31.1"
+pkl = "0.32.0"
 # clover: provider=auto constraint=minor tags=rumdl
-rumdl = "0.1.86"
+rumdl = "0.2.34"
 # clover: provider=auto constraint=minor tags=shellcheck
 shellcheck = "0.11.0"
 # clover: provider=auto constraint=minor tags=zizmor
-zizmor = "1.24.1"
+zizmor = "1.27.0"
 
 [env]
 HK_MISE = 1

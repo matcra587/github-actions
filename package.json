@@ -2,7 +2,7 @@
   "name": "@matcra587/github-actions",
   "version": "0.1.0",
   "private": true,
-  "packageManager": "bun@1.3.13",
+  "packageManager": "bun@1.3.14",
   "workspaces": [
     "packages/*"
   ],
