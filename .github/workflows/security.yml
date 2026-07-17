@@ -50,8 +50,8 @@ on:
         description: Minimum zizmor confidence to report.
         type: string
         default: ""
-      zizmor-advanced-security:
-        description: Upload SARIF to GitHub Advanced Security code scanning. Suppressed automatically on private repositories, where GHAS is a paid feature. Callers enabling this must grant security-events write.
+      sarif:
+        description: Upload SARIF results (zizmor, govulncheck, uv audit) to GitHub code scanning. Suppressed automatically on private repositories, where GHAS is a paid feature. Callers enabling this must grant security-events write.
         type: boolean
         default: false
       zizmor-annotations:
@@ -136,6 +136,7 @@ jobs:
 
   zizmor:
     name: Zizmor workflow security
+    needs: context
     if: "!contains(inputs.skip, 'zizmor')"
     runs-on: ubuntu-latest
     steps:
@@ -157,32 +158,36 @@ jobs:
           min-confidence: ${{ inputs.zizmor-min-confidence }}
           version: ${{ inputs.zizmor-version }}
           token: ${{ github.token }}
-          # SARIF upload needs GHAS code scanning, a paid feature on private
-          # repos, so visibility gates the input rather than each caller.
           # annotations and advanced-security are mutually exclusive in the
           # action (it hard-fails on both), so annotations yields whenever
           # the SARIF path is effective.
-          advanced-security: ${{ inputs.zizmor-advanced-security && !github.event.repository.private }}
-          annotations: ${{ inputs.zizmor-annotations && !(inputs.zizmor-advanced-security && !github.event.repository.private) }}
+          advanced-security: ${{ needs.context.outputs.sarif-effective }}
+          annotations: ${{ inputs.zizmor-annotations && needs.context.outputs.sarif-effective != 'true' }}
           color: ${{ inputs.zizmor-color }}
           config: ${{ inputs.zizmor-config }}
           fail-on-no-inputs: ${{ inputs.zizmor-fail-on-no-inputs }}
 
-  # Asks linguist which languages the repository contains so language-specific
-  # jobs can gate themselves at the job level — zero-config for callers. The
-  # output is the full language set, so new scanners (uv/pip audit, ...)
-  # consume it read-only:
-  #   contains(fromJSON(needs.languages.outputs.languages), 'Python')
-  # Always runs: one cheap API call, and it fails fast on skip-list typos —
-  # a silently ignored typo would leave the caller believing a scan is off
-  # while it still runs (or vice versa).
-  languages:
-    name: Detect repository languages
+  # Resolves the repository facts the other jobs gate on: the full linguist
+  # language set (so language scanners self-gate at the job level, and new
+  # scanners consume it read-only):
+  #   contains(fromJSON(needs.context.outputs.languages), 'Python')
+  # and the repo visibility. Always runs: one cheap API call (two on
+  # scheduled runs), and it fails fast on skip-list typos — a silently
+  # ignored typo would leave the caller believing a scan is off while it
+  # still runs (or vice versa).
+  context:
+    name: Repository context
     runs-on: ubuntu-latest
     permissions:
       contents: read
     outputs:
       languages: ${{ steps.linguist.outputs.languages }}
+      # "SARIF upload is effective": requested by the caller and the repo is
+      # public (GHAS code scanning is paid on private repos). Visibility is
+      # resolved server-side because the schedule event has no repository
+      # payload — `!github.event.repository.private` reads true (public)
+      # on scheduled runs, silently lifting the private-repo suppression.
+      sarif-effective: ${{ inputs.sarif && steps.linguist.outputs.private != 'true' }}
     steps:
       - name: Validate skip list and query linguist
         id: linguist
@@ -206,14 +211,21 @@ jobs:
             const names = Object.keys(languages);
             core.info(`Linguist languages: ${names.join(', ') || '(none)'}`);
             core.setOutput('languages', JSON.stringify(names));
+            const repository = context.payload.repository
+              ?? (await github.rest.repos.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+              })).data;
+            core.info(`Repository private: ${repository.private}`);
+            core.setOutput('private', repository.private);
 
+  # No explicit permissions: inherits the caller's so the SARIF upload can
+  # receive security-events write when the caller grants it.
   govulncheck:
     name: govulncheck
-    needs: languages
-    if: "!contains(inputs.skip, 'govulncheck') && contains(fromJSON(needs.languages.outputs.languages), 'Go')"
+    needs: context
+    if: "!contains(inputs.skip, 'govulncheck') && contains(fromJSON(needs.context.outputs.languages), 'Go')"
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
     steps:
       - name: Checkout
         # clover: provider=auto constraint=minor tags=checkout
@@ -232,13 +244,34 @@ jobs:
           go-version-file: ${{ inputs.go-version-file }}
           go-package: ${{ inputs.go-package }}
 
+      # Second pass only for code scanning: govulncheck's SARIF mode exits 0
+      # on findings, so the text pass above still owns failing the job.
+      - name: Run govulncheck (SARIF)
+        if: ${{ !cancelled() && needs.context.outputs.sarif-effective == 'true' }}
+        # clover: provider=auto constraint=minor tags=govulncheck-action
+        uses: golang/govulncheck-action@032d45514ae346b1db93c04b0c90b841c370344f # v1.1.0
+        with:
+          repo-checkout: false
+          go-version-file: ${{ inputs.go-version-file }}
+          go-package: ${{ inputs.go-package }}
+          output-format: sarif
+          output-file: govulncheck.sarif
+
+      - name: Upload SARIF to code scanning
+        if: ${{ !cancelled() && needs.context.outputs.sarif-effective == 'true' }}
+        # clover: provider=auto constraint=minor tags=codeql-action
+        uses: github/codeql-action/upload-sarif@54f647b7e1bb85c95cddabcd46b0c578ec92bc1a # v4.36.3
+        with:
+          sarif_file: govulncheck.sarif
+          category: govulncheck
+
   bun-audit:
     name: Bun audit
-    needs: languages
+    needs: context
     if: >-
       !contains(inputs.skip, 'bun-audit') && (
-        contains(fromJSON(needs.languages.outputs.languages), 'JavaScript') ||
-        contains(fromJSON(needs.languages.outputs.languages), 'TypeScript')
+        contains(fromJSON(needs.context.outputs.languages), 'JavaScript') ||
+        contains(fromJSON(needs.context.outputs.languages), 'TypeScript')
       )
     runs-on: ubuntu-latest
     permissions:
@@ -267,15 +300,15 @@ jobs:
         env:
           BUN_AUDIT_LEVEL: ${{ inputs.bun-audit-level }}
 
+  # No explicit permissions: inherits the caller's so the SARIF upload can
+  # receive security-events write when the caller grants it.
   uv-audit:
     name: uv audit
-    needs: languages
+    needs: context
     if: >-
       !contains(inputs.skip, 'uv-audit') &&
-      contains(fromJSON(needs.languages.outputs.languages), 'Python')
+      contains(fromJSON(needs.context.outputs.languages), 'Python')
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
     steps:
       - name: Checkout
         # clover: provider=auto constraint=minor tags=checkout
@@ -293,14 +326,32 @@ jobs:
         with:
           version: ${{ inputs.uv-version }}
 
+      # Exactly one of the next two steps runs. Unlike govulncheck, uv audit
+      # still exits nonzero on findings in SARIF mode, so a single pass both
+      # fails the job and produces the upload artifact; findings then live in
+      # code scanning rather than the job log.
       - name: Run uv audit
-        if: hashFiles('uv.lock') != ''
+        if: ${{ hashFiles('uv.lock') != '' && needs.context.outputs.sarif-effective != 'true' }}
         run: uv audit --frozen
+
+      - name: Run uv audit (SARIF)
+        if: ${{ hashFiles('uv.lock') != '' && needs.context.outputs.sarif-effective == 'true' }}
+        run: uv audit --frozen --output-format sarif > uv-audit.sarif
+
+      - name: Upload SARIF to code scanning
+        if: ${{ !cancelled() && hashFiles('uv.lock') != '' && needs.context.outputs.sarif-effective == 'true' }}
+        # clover: provider=auto constraint=minor tags=codeql-action
+        uses: github/codeql-action/upload-sarif@54f647b7e1bb85c95cddabcd46b0c578ec92bc1a # v4.36.3
+        with:
+          sarif_file: uv-audit.sarif
+          category: uv-audit
 
   # PR-only: the action diffs the PR's dependency changes against the
   # GitHub Advisory Database; there is no diff to review on a push. Gated to
   # public visibility because the dependency-diff API needs GitHub Advanced
-  # Security on private repos.
+  # Security on private repos. The event-based visibility read is safe here
+  # (unlike the context job's concern): PR payloads always carry
+  # repository.private, so no needs edge on context.
   dependency-review:
     name: Dependency review
     if: "!contains(inputs.skip, 'dependency-review') && github.event_name == 'pull_request' && !github.event.repository.private"

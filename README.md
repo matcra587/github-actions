@@ -29,15 +29,18 @@ TypeScript dependency advisories, `uv audit` for Python dependency
 advisories, and dependency review for PR dependency diffs. Jobs gate
 themselves at runtime instead of needing caller configuration:
 
-*   A `languages` job queries linguist (the repository languages API) and
-    exposes the full language set; `govulncheck` skips itself when the repo
-    contains no Go, `bun audit` when it has no JavaScript/TypeScript (or no
-    Bun lockfile), `uv audit` when it has no Python (or no uv.lock). New
-    language scanners gate on the same output.
+*   A `context` job resolves repo facts the scanners gate on — the linguist
+    language set and the repo visibility; `govulncheck` skips itself when
+    the repo contains no Go, `bun audit` when it has no JavaScript/
+    TypeScript (or no Bun lockfile), `uv audit` when it has no Python (or
+    no uv.lock). New language scanners gate on the same outputs.
 *   Dependency review runs only on pull requests against public repositories
     (the dependency-diff API needs GitHub Advanced Security on private repos).
-*   `zizmor-advanced-security` is suppressed on private repositories, where
-    GHAS code scanning is a paid feature.
+*   `sarif: true` uploads zizmor, govulncheck, and uv audit results to
+    GitHub code scanning; the upload is suppressed on private repositories,
+    where GHAS code scanning is a paid feature. Failing on findings is
+    unchanged (govulncheck's SARIF pass is artifact-only; uv audit's SARIF
+    mode fails on findings itself).
 
 To force a job off, pass `skip` — a whitespace-separated list of job names
 (`actionlint`, `zizmor`, `govulncheck`, `bun-audit`, `uv-audit`,
@@ -64,10 +67,10 @@ jobs:
       zizmor-version: "1.24.1"
 ```
 
-Set `zizmor-advanced-security: true` and add `security-events: write` to the
-caller job permissions only when uploading SARIF to code scanning (public
-repositories, or private ones would need GHAS — the workflow suppresses the
-upload there regardless).
+Set `sarif: true` and add `security-events: write` to the caller job
+permissions only when uploading SARIF to code scanning (public repositories;
+private ones would need GHAS — the workflow suppresses the upload there
+regardless).
 
 `security.yml` replaces the retired `workflow-lint.yml`; existing consumers
 pinned to a `workflow-lint` commit SHA keep working, since reusable workflows
