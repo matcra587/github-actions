@@ -24,14 +24,16 @@ Shared GitHub Actions for `matcra587` repositories.
 ### `security.yml`
 
 One security workflow for every repo: `actionlint` and `zizmor` for workflow
-changes, `govulncheck` for Go vulnerabilities, and dependency review for PR
-dependency diffs. Jobs gate themselves at runtime instead of needing caller
+changes, `govulncheck` for Go vulnerabilities, `bun audit` for JavaScript /
+TypeScript dependency advisories, and dependency review for PR dependency
+diffs. Jobs gate themselves at runtime instead of needing caller
 configuration:
 
 *   A `languages` job queries linguist (the repository languages API) and
     exposes the full language set; `govulncheck` skips itself when the repo
-    contains no Go. Future language scanners (uv/pip audit, bun audit, ...)
-    gate on the same output.
+    contains no Go, `bun audit` when it has no JavaScript/TypeScript (or no
+    Bun lockfile). Future language scanners (uv/pip audit, ...) gate on the
+    same output.
 *   Dependency review runs only on pull requests against public repositories
     (the dependency-diff API needs GitHub Advanced Security on private repos).
 *   `zizmor-advanced-security` is suppressed on private repositories, where

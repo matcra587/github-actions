@@ -20,6 +20,10 @@ on:
         description: Run actions/dependency-review-action. Skips itself outside pull requests and on private repositories, where the dependency-diff API needs GitHub Advanced Security.
         type: boolean
         default: true
+      bun-audit:
+        description: Run `bun audit`. Skips itself when linguist reports no JavaScript or TypeScript, or when the repository has no Bun lockfile.
+        type: boolean
+        default: true
       actionlint-version:
         description: actionlint version installed by mise.
         type: string
@@ -87,6 +91,14 @@ on:
         default: ./...
       dependency-review-fail-on-severity:
         description: Severity threshold passed to dependency-review.
+        type: string
+        default: moderate
+      bun-version:
+        description: Bun version installed by setup-bun.
+        type: string
+        default: latest
+      bun-audit-level:
+        description: Minimum advisory severity passed to `bun audit --audit-level`.
         type: string
         default: moderate
 
@@ -171,7 +183,7 @@ jobs:
   # When adding a scanner, extend this job's `if` with the scanner's toggle.
   languages:
     name: Detect repository languages
-    if: inputs.govulncheck
+    if: inputs.govulncheck || inputs.bun-audit
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -216,6 +228,41 @@ jobs:
           repo-checkout: false
           go-version-file: ${{ inputs.go-version-file }}
           go-package: ${{ inputs.go-package }}
+
+  bun-audit:
+    name: Bun audit
+    needs: languages
+    if: >-
+      inputs.bun-audit && (
+        contains(fromJSON(needs.languages.outputs.languages), 'JavaScript') ||
+        contains(fromJSON(needs.languages.outputs.languages), 'TypeScript')
+      )
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        # clover: provider=auto constraint=minor tags=checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      # bun audit reads the lockfile directly, no install needed. Repos that
+      # are JavaScript/TypeScript per linguist but not Bun-managed skip here.
+      - name: Install Bun
+        if: hashFiles('bun.lock', 'bun.lockb') != ''
+        # clover: provider=auto constraint=minor tags=setup-bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: ${{ inputs.bun-version }}
+
+      - name: Run bun audit
+        if: hashFiles('bun.lock', 'bun.lockb') != ''
+        run: bun audit --audit-level="${BUN_AUDIT_LEVEL}"
+        shell: bash
+        env:
+          BUN_AUDIT_LEVEL: ${{ inputs.bun-audit-level }}
 
   # PR-only: the action diffs the PR's dependency changes against the
   # GitHub Advisory Database; there is no diff to review on a push. Gated to
