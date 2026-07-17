@@ -105,7 +105,7 @@ jobs:
       - name: Await gates for tagged commit
         if: steps.release-state.outputs.exists != 'true' && inputs.gates != ''
         # clover: provider=github repository=matcra587/github-actions tag-prefix=await-gates/ tags=actions
-        uses: matcra587/github-actions/packages/await-gates@0d4d0ac90375afc54cae61ea6023cdb1da4aa5a3 # tag=await-gates/v0.1.0
+        uses: matcra587/github-actions/packages/await-gates@2340f3f78bb0853dbef8f6d80b97dd632bb06a65 # tag=await-gates/v0.1.1
         with:
           gates: ${{ inputs.gates }}
 
