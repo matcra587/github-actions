@@ -1,6 +1,6 @@
 {
   "name": "@matcra587/security-workflow",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "private": true,
   "description": "Version anchor for the security.yml reusable workflow; no code, the release workflow reads this version to cut security/vX.Y.Z tags."
 }

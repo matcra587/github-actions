@@ -18,9 +18,9 @@ on:
         type: string
         default: "1.7.12"
       mise-version:
-        description: mise version used to install actionlint.
+        description: mise version used to install actionlint. Empty installs the latest release, which also satisfies any min_version in the caller repo's mise.toml.
         type: string
-        default: "2026.4.28"
+        default: ""
       actionlint-args:
         description: Newline-separated arguments passed to actionlint.
         type: string
