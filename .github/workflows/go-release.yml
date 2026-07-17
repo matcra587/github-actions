@@ -173,8 +173,8 @@ jobs:
               echo
               echo "**Full Changelog**: ${repo}/compare/${prev}...${TAG_NAME}"
             fi
-          } > .release-notes.md
-          cat .release-notes.md
+          } > "${RUNNER_TEMP}/release-notes.md"
+          cat "${RUNNER_TEMP}/release-notes.md"
         shell: bash
 
       - name: Run GoReleaser
@@ -184,7 +184,11 @@ jobs:
         with:
           distribution: goreleaser
           version: ${{ inputs.goreleaser-version }}
-          args: release --clean --release-notes=.release-notes.md
+          # runner.temp keeps the notes out of the checkout: goreleaser
+          # --clean refuses to release from a dirty worktree, and the
+          # action execs goreleaser without a shell, so an env var here
+          # would never expand.
+          args: release --clean --release-notes=${{ runner.temp }}/release-notes.md
         env:
           GITHUB_TOKEN: ${{ github.token }}
 
