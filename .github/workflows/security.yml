@@ -8,9 +8,9 @@ on:
         description: >-
           Jobs to skip, whitespace-separated. Entries are verified — unknown
           names fail the workflow. Allowed values are actionlint, zizmor,
-          govulncheck, bun-audit, and dependency-review. Everything runs by
-          default; jobs also gate themselves at runtime (linguist languages,
-          Bun lockfile, PR event, repo visibility).
+          govulncheck, bun-audit, uv-audit, and dependency-review. Everything
+          runs by default; jobs also gate themselves at runtime (linguist
+          languages, lockfile presence, PR event, repo visibility).
         type: string
         default: ""
       actionlint-version:
@@ -90,6 +90,10 @@ on:
         description: Minimum advisory severity passed to `bun audit --audit-level`.
         type: string
         default: moderate
+      uv-version:
+        description: uv version installed by setup-uv.
+        type: string
+        default: latest
 
 jobs:
   actionlint:
@@ -188,7 +192,7 @@ jobs:
           SKIP: ${{ inputs.skip }}
         with:
           script: |
-            const allowed = ['actionlint', 'zizmor', 'govulncheck', 'bun-audit', 'dependency-review'];
+            const allowed = ['actionlint', 'zizmor', 'govulncheck', 'bun-audit', 'uv-audit', 'dependency-review'];
             const unknown = process.env.SKIP.split(/\s+/).filter(Boolean)
               .filter((name) => !allowed.includes(name));
             if (unknown.length > 0) {
@@ -262,6 +266,36 @@ jobs:
         shell: bash
         env:
           BUN_AUDIT_LEVEL: ${{ inputs.bun-audit-level }}
+
+  uv-audit:
+    name: uv audit
+    needs: languages
+    if: >-
+      !contains(inputs.skip, 'uv-audit') &&
+      contains(fromJSON(needs.languages.outputs.languages), 'Python')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        # clover: provider=auto constraint=minor tags=checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      # uv audit reads uv.lock directly. Repos that are Python per linguist
+      # but not uv-managed skip here.
+      - name: Install uv
+        if: hashFiles('uv.lock') != ''
+        # clover: provider=auto constraint=minor tags=setup-uv
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
+          version: ${{ inputs.uv-version }}
+
+      - name: Run uv audit
+        if: hashFiles('uv.lock') != ''
+        run: uv audit --frozen
 
   # PR-only: the action diffs the PR's dependency changes against the
   # GitHub Advisory Database; there is no diff to review on a push. Gated to
