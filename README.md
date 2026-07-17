@@ -37,13 +37,15 @@ themselves at runtime instead of needing caller configuration:
 *   Dependency review runs only on pull requests against public repositories
     (the dependency-diff API needs GitHub Advanced Security on private repos).
 *   `sarif: true` uploads zizmor, govulncheck, and uv audit results to
-    GitHub code scanning; the upload is suppressed on private repositories,
-    where GHAS code scanning is a paid feature. Failing on findings is
-    unchanged (govulncheck's SARIF pass is artifact-only; uv audit's SARIF
-    mode fails on findings itself).
+    GitHub code scanning, and enables CodeQL analysis (language matrix from
+    linguist — interpreted languages with `build-mode: none`, Go with
+    `autobuild`); everything is suppressed
+    on private repositories, where GHAS code scanning is a paid feature.
+    Failing on findings is unchanged (govulncheck's SARIF pass is
+    artifact-only; uv audit's SARIF mode fails on findings itself).
 
 To force a job off, pass `skip` — a whitespace-separated list of job names
-(`actionlint`, `zizmor`, `govulncheck`, `bun-audit`, `uv-audit`,
+(`actionlint`, `zizmor`, `govulncheck`, `bun-audit`, `uv-audit`, `codeql`,
 `dependency-review`).
 Entries are verified; unknown names fail the workflow rather than silently
 leaving the scan running.

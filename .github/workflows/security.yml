@@ -8,9 +8,9 @@ on:
         description: >-
           Jobs to skip, whitespace-separated. Entries are verified — unknown
           names fail the workflow. Allowed values are actionlint, zizmor,
-          govulncheck, bun-audit, uv-audit, and dependency-review. Everything
-          runs by default; jobs also gate themselves at runtime (linguist
-          languages, lockfile presence, PR event, repo visibility).
+          govulncheck, bun-audit, uv-audit, codeql, and dependency-review.
+          Everything runs by default; jobs also gate themselves at runtime
+          (linguist languages, lockfile presence, PR event, repo visibility).
         type: string
         default: ""
       actionlint-version:
@@ -182,6 +182,7 @@ jobs:
       contents: read
     outputs:
       languages: ${{ steps.linguist.outputs.languages }}
+      codeql-matrix: ${{ steps.linguist.outputs.codeql-matrix }}
       # "SARIF upload is effective": requested by the caller and the repo is
       # public (GHAS code scanning is paid on private repos). Visibility is
       # resolved server-side because the schedule event has no repository
@@ -197,7 +198,7 @@ jobs:
           SKIP: ${{ inputs.skip }}
         with:
           script: |
-            const allowed = ['actionlint', 'zizmor', 'govulncheck', 'bun-audit', 'uv-audit', 'dependency-review'];
+            const allowed = ['actionlint', 'zizmor', 'govulncheck', 'bun-audit', 'uv-audit', 'codeql', 'dependency-review'];
             const unknown = process.env.SKIP.split(/\s+/).filter(Boolean)
               .filter((name) => !allowed.includes(name));
             if (unknown.length > 0) {
@@ -211,6 +212,26 @@ jobs:
             const names = Object.keys(languages);
             core.info(`Linguist languages: ${names.join(', ') || '(none)'}`);
             core.setOutput('languages', JSON.stringify(names));
+            // Interpreted languages analyze with build-mode none; Go needs
+            // autobuild (none is unsupported for Go/Swift/Kotlin). Other
+            // compiled languages are out — they'd need manual build steps.
+            const codeqlMap = {
+              Go: { language: 'go', 'build-mode': 'autobuild' },
+              JavaScript: { language: 'javascript-typescript', 'build-mode': 'none' },
+              TypeScript: { language: 'javascript-typescript', 'build-mode': 'none' },
+              Python: { language: 'python', 'build-mode': 'none' },
+              Ruby: { language: 'ruby', 'build-mode': 'none' },
+            };
+            const seen = new Set();
+            const codeqlMatrix = [];
+            for (const name of names) {
+              const entry = codeqlMap[name];
+              if (entry && !seen.has(entry.language)) {
+                seen.add(entry.language);
+                codeqlMatrix.push(entry);
+              }
+            }
+            core.setOutput('codeql-matrix', JSON.stringify(codeqlMatrix));
             const repository = context.payload.repository
               ?? (await github.rest.repos.get({
                 owner: context.repo.owner,
@@ -263,7 +284,7 @@ jobs:
       - name: Upload SARIF to code scanning
         if: ${{ !cancelled() && hashFiles(inputs.go-version-file) != '' && needs.context.outputs.sarif-effective == 'true' }}
         # clover: provider=auto constraint=minor tags=codeql-action
-        uses: github/codeql-action/upload-sarif@54f647b7e1bb85c95cddabcd46b0c578ec92bc1a # v4.36.3
+        uses: github/codeql-action/upload-sarif@7188fc363630916deb702c7fdcf4e481b751f97a # v4.37.1
         with:
           sarif_file: govulncheck.sarif
           category: govulncheck
@@ -344,10 +365,47 @@ jobs:
       - name: Upload SARIF to code scanning
         if: ${{ !cancelled() && hashFiles('uv.lock') != '' && needs.context.outputs.sarif-effective == 'true' }}
         # clover: provider=auto constraint=minor tags=codeql-action
-        uses: github/codeql-action/upload-sarif@54f647b7e1bb85c95cddabcd46b0c578ec92bc1a # v4.36.3
+        uses: github/codeql-action/upload-sarif@7188fc363630916deb702c7fdcf4e481b751f97a # v4.37.1
         with:
           sarif_file: uv-audit.sarif
           category: uv-audit
+
+  # CodeQL only produces value through its code-scanning upload, which needs
+  # GHAS and caller-granted security-events write — so the whole job keys off
+  # the same sarif-effective fact as the other uploads. No explicit
+  # permissions block for the same passthrough reason as the scanners above.
+  codeql:
+    name: CodeQL (${{ matrix.language }})
+    needs: context
+    if: >-
+      !contains(inputs.skip, 'codeql') &&
+      needs.context.outputs.sarif-effective == 'true' &&
+      needs.context.outputs.codeql-matrix != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.context.outputs.codeql-matrix) }}
+    steps:
+      - name: Checkout
+        # clover: provider=auto constraint=minor tags=checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Initialize CodeQL
+        # clover: provider=auto constraint=minor tags=codeql-action
+        uses: github/codeql-action/init@7188fc363630916deb702c7fdcf4e481b751f97a # v4.37.1
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+
+      - name: Analyze
+        # clover: provider=auto constraint=minor tags=codeql-action
+        uses: github/codeql-action/analyze@7188fc363630916deb702c7fdcf4e481b751f97a # v4.37.1
+        with:
+          category: codeql:${{ matrix.language }}
 
   # PR-only: the action diffs the PR's dependency changes against the
   # GitHub Advisory Database; there is no diff to review on a push. Gated to
