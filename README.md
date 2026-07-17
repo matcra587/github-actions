@@ -39,6 +39,11 @@ configuration:
 *   `zizmor-advanced-security` is suppressed on private repositories, where
     GHAS code scanning is a paid feature.
 
+To force a job off, pass `skip` — a whitespace-separated list of job names
+(`actionlint`, `zizmor`, `govulncheck`, `bun-audit`, `dependency-review`).
+Entries are verified; unknown names fail the workflow rather than silently
+leaving the scan running.
+
 ```yaml
 on:
   pull_request:

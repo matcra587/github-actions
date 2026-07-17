@@ -4,26 +4,15 @@ name: security
 on:
   workflow_call:
     inputs:
-      actionlint:
-        description: Run actionlint.
-        type: boolean
-        default: true
-      zizmor:
-        description: Run zizmor.
-        type: boolean
-        default: true
-      govulncheck:
-        description: Run govulncheck. Skips itself when linguist reports no Go in the repository.
-        type: boolean
-        default: true
-      dependency-review:
-        description: Run actions/dependency-review-action. Skips itself outside pull requests and on private repositories, where the dependency-diff API needs GitHub Advanced Security.
-        type: boolean
-        default: true
-      bun-audit:
-        description: Run `bun audit`. Skips itself when linguist reports no JavaScript or TypeScript, or when the repository has no Bun lockfile.
-        type: boolean
-        default: true
+      skip:
+        description: >-
+          Jobs to skip, whitespace-separated. Entries are verified — unknown
+          names fail the workflow. Allowed values are actionlint, zizmor,
+          govulncheck, bun-audit, and dependency-review. Everything runs by
+          default; jobs also gate themselves at runtime (linguist languages,
+          Bun lockfile, PR event, repo visibility).
+        type: string
+        default: ""
       actionlint-version:
         description: actionlint version installed by mise.
         type: string
@@ -105,7 +94,7 @@ on:
 jobs:
   actionlint:
     name: ActionLint
-    if: inputs.actionlint
+    if: "!contains(inputs.skip, 'actionlint')"
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -143,7 +132,7 @@ jobs:
 
   zizmor:
     name: Zizmor workflow security
-    if: inputs.zizmor
+    if: "!contains(inputs.skip, 'zizmor')"
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -177,25 +166,35 @@ jobs:
 
   # Asks linguist which languages the repository contains so language-specific
   # jobs can gate themselves at the job level — zero-config for callers. The
-  # output is the full language set, so future scanners (uv/pip audit, bun
-  # audit, ...) consume it read-only:
+  # output is the full language set, so new scanners (uv/pip audit, ...)
+  # consume it read-only:
   #   contains(fromJSON(needs.languages.outputs.languages), 'Python')
-  # When adding a scanner, extend this job's `if` with the scanner's toggle.
+  # Always runs: one cheap API call, and it fails fast on skip-list typos —
+  # a silently ignored typo would leave the caller believing a scan is off
+  # while it still runs (or vice versa).
   languages:
     name: Detect repository languages
-    if: inputs.govulncheck || inputs.bun-audit
     runs-on: ubuntu-latest
     permissions:
       contents: read
     outputs:
       languages: ${{ steps.linguist.outputs.languages }}
     steps:
-      - name: Query linguist
+      - name: Validate skip list and query linguist
         id: linguist
         # clover: provider=auto constraint=minor tags=github-script
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          SKIP: ${{ inputs.skip }}
         with:
           script: |
+            const allowed = ['actionlint', 'zizmor', 'govulncheck', 'bun-audit', 'dependency-review'];
+            const unknown = process.env.SKIP.split(/\s+/).filter(Boolean)
+              .filter((name) => !allowed.includes(name));
+            if (unknown.length > 0) {
+              core.setFailed(`Unknown skip entries: ${unknown.join(', ')}. Allowed: ${allowed.join(', ')}.`);
+              return;
+            }
             const { data: languages } = await github.rest.repos.listLanguages({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -207,7 +206,7 @@ jobs:
   govulncheck:
     name: govulncheck
     needs: languages
-    if: inputs.govulncheck && contains(fromJSON(needs.languages.outputs.languages), 'Go')
+    if: "!contains(inputs.skip, 'govulncheck') && contains(fromJSON(needs.languages.outputs.languages), 'Go')"
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -233,7 +232,7 @@ jobs:
     name: Bun audit
     needs: languages
     if: >-
-      inputs.bun-audit && (
+      !contains(inputs.skip, 'bun-audit') && (
         contains(fromJSON(needs.languages.outputs.languages), 'JavaScript') ||
         contains(fromJSON(needs.languages.outputs.languages), 'TypeScript')
       )
@@ -270,7 +269,7 @@ jobs:
   # Security on private repos.
   dependency-review:
     name: Dependency review
-    if: inputs.dependency-review && github.event_name == 'pull_request' && !github.event.repository.private
+    if: "!contains(inputs.skip, 'dependency-review') && github.event_name == 'pull_request' && !github.event.repository.private"
     runs-on: ubuntu-latest
     permissions:
       contents: read
