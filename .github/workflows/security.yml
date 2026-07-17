@@ -1,0 +1,242 @@
+---
+name: security
+
+on:
+  workflow_call:
+    inputs:
+      actionlint:
+        description: Run actionlint.
+        type: boolean
+        default: true
+      zizmor:
+        description: Run zizmor.
+        type: boolean
+        default: true
+      govulncheck:
+        description: Run govulncheck. Skips itself when linguist reports no Go in the repository.
+        type: boolean
+        default: true
+      dependency-review:
+        description: Run actions/dependency-review-action. Skips itself outside pull requests and on private repositories, where the dependency-diff API needs GitHub Advanced Security.
+        type: boolean
+        default: true
+      actionlint-version:
+        description: actionlint version installed by mise.
+        type: string
+        default: "1.7.12"
+      mise-version:
+        description: mise version used to install actionlint.
+        type: string
+        default: "2026.4.28"
+      actionlint-args:
+        description: Newline-separated arguments passed to actionlint.
+        type: string
+        default: |-
+          -color
+      zizmor-inputs:
+        description: Paths passed to zizmor.
+        type: string
+        default: ./.github/
+      zizmor-version:
+        description: zizmor version installed by zizmor-action.
+        type: string
+        default: "1.24.1"
+      zizmor-online-audits:
+        description: Run zizmor online audits.
+        type: boolean
+        default: true
+      zizmor-persona:
+        description: Zizmor persona.
+        type: string
+        default: pedantic
+      zizmor-min-severity:
+        description: Minimum zizmor severity to report.
+        type: string
+        default: ""
+      zizmor-min-confidence:
+        description: Minimum zizmor confidence to report.
+        type: string
+        default: ""
+      zizmor-advanced-security:
+        description: Upload SARIF to GitHub Advanced Security code scanning. Suppressed automatically on private repositories, where GHAS is a paid feature. Callers enabling this must grant security-events write.
+        type: boolean
+        default: false
+      zizmor-annotations:
+        description: Emit workflow annotations.
+        type: boolean
+        default: true
+      zizmor-color:
+        description: Emit colorized zizmor CLI output.
+        type: boolean
+        default: true
+      zizmor-config:
+        description: Optional zizmor configuration path.
+        type: string
+        default: ""
+      zizmor-fail-on-no-inputs:
+        description: Fail if zizmor cannot collect any inputs.
+        type: boolean
+        default: true
+      go-version-file:
+        description: Path to the go.mod govulncheck uses for toolchain selection.
+        type: string
+        default: go.mod
+      go-package:
+        description: Package pattern passed to govulncheck.
+        type: string
+        default: ./...
+      dependency-review-fail-on-severity:
+        description: Severity threshold passed to dependency-review.
+        type: string
+        default: moderate
+
+jobs:
+  actionlint:
+    name: ActionLint
+    if: inputs.actionlint
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        # clover: provider=auto constraint=minor tags=checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Install mise
+        # clover: provider=auto constraint=minor tags=mise-action
+        uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4.2.0
+        with:
+          version: ${{ inputs.mise-version }}
+          github_token: ${{ github.token }}
+          mise_toml: |
+            [tools]
+            actionlint = "${{ inputs.actionlint-version }}"
+
+      - name: Run actionlint
+        run: |
+          set -euo pipefail
+          args=()
+          while IFS= read -r arg; do
+            if [ -n "${arg}" ]; then
+              args+=("${arg}")
+            fi
+          done <<< "${ACTIONLINT_ARGS}"
+          actionlint "${args[@]}"
+        shell: bash
+        env:
+          ACTIONLINT_ARGS: ${{ inputs.actionlint-args }}
+
+  zizmor:
+    name: Zizmor workflow security
+    if: inputs.zizmor
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        # clover: provider=auto constraint=minor tags=checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Run zizmor
+        # clover: provider=auto constraint=minor tags=zizmor-action
+        uses: zizmorcore/zizmor-action@6599ee8b7a49aef6a770f63d261d214911a7ce02 # v0.6.0
+        with:
+          inputs: ${{ inputs.zizmor-inputs }}
+          online-audits: ${{ inputs.zizmor-online-audits }}
+          persona: ${{ inputs.zizmor-persona }}
+          min-severity: ${{ inputs.zizmor-min-severity }}
+          min-confidence: ${{ inputs.zizmor-min-confidence }}
+          version: ${{ inputs.zizmor-version }}
+          token: ${{ github.token }}
+          # SARIF upload needs GHAS code scanning, a paid feature on private
+          # repos, so visibility gates the input rather than each caller.
+          # annotations and advanced-security are mutually exclusive in the
+          # action (it hard-fails on both), so annotations yields whenever
+          # the SARIF path is effective.
+          advanced-security: ${{ inputs.zizmor-advanced-security && !github.event.repository.private }}
+          annotations: ${{ inputs.zizmor-annotations && !(inputs.zizmor-advanced-security && !github.event.repository.private) }}
+          color: ${{ inputs.zizmor-color }}
+          config: ${{ inputs.zizmor-config }}
+          fail-on-no-inputs: ${{ inputs.zizmor-fail-on-no-inputs }}
+
+  # Asks linguist which languages the repository contains so language-specific
+  # jobs can gate themselves at the job level — zero-config for callers. The
+  # output is the full language set, so future scanners (uv/pip audit, bun
+  # audit, ...) consume it read-only:
+  #   contains(fromJSON(needs.languages.outputs.languages), 'Python')
+  # When adding a scanner, extend this job's `if` with the scanner's toggle.
+  languages:
+    name: Detect repository languages
+    if: inputs.govulncheck
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      languages: ${{ steps.linguist.outputs.languages }}
+    steps:
+      - name: Query linguist
+        id: linguist
+        # clover: provider=auto constraint=minor tags=github-script
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const { data: languages } = await github.rest.repos.listLanguages({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            });
+            const names = Object.keys(languages);
+            core.info(`Linguist languages: ${names.join(', ') || '(none)'}`);
+            core.setOutput('languages', JSON.stringify(names));
+
+  govulncheck:
+    name: govulncheck
+    needs: languages
+    if: inputs.govulncheck && contains(fromJSON(needs.languages.outputs.languages), 'Go')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        # clover: provider=auto constraint=minor tags=checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      # The action handles its own Go setup; repo-checkout is off because
+      # the explicit checkout above already ran with hardened settings.
+      - name: Run govulncheck
+        # clover: provider=auto constraint=minor tags=govulncheck-action
+        uses: golang/govulncheck-action@032d45514ae346b1db93c04b0c90b841c370344f # v1.1.0
+        with:
+          repo-checkout: false
+          go-version-file: ${{ inputs.go-version-file }}
+          go-package: ${{ inputs.go-package }}
+
+  # PR-only: the action diffs the PR's dependency changes against the
+  # GitHub Advisory Database; there is no diff to review on a push. Gated to
+  # public visibility because the dependency-diff API needs GitHub Advanced
+  # Security on private repos.
+  dependency-review:
+    name: Dependency review
+    if: inputs.dependency-review && github.event_name == 'pull_request' && !github.event.repository.private
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        # clover: provider=auto constraint=minor tags=checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Dependency review
+        # clover: provider=auto constraint=minor tags=dependency-review-action
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: ${{ inputs.dependency-review-fail-on-severity }}

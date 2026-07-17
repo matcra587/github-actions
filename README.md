@@ -21,20 +21,31 @@ Shared GitHub Actions for `matcra587` repositories.
 
 ## Reusable Workflows
 
-### `workflow-lint.yml`
+### `security.yml`
 
-Runs `actionlint` and `zizmor` for workflow changes. The workflow installs a
-pinned `actionlint` through `mise`, then runs the pinned `zizmor` action.
+One security workflow for every repo: `actionlint` and `zizmor` for workflow
+changes, `govulncheck` for Go vulnerabilities, and dependency review for PR
+dependency diffs. Jobs gate themselves at runtime instead of needing caller
+configuration:
+
+*   A `languages` job queries linguist (the repository languages API) and
+    exposes the full language set; `govulncheck` skips itself when the repo
+    contains no Go. Future language scanners (uv/pip audit, bun audit, ...)
+    gate on the same output.
+*   Dependency review runs only on pull requests against public repositories
+    (the dependency-diff API needs GitHub Advanced Security on private repos).
+*   `zizmor-advanced-security` is suppressed on private repositories, where
+    GHAS code scanning is a paid feature.
 
 ```yaml
 on:
   pull_request:
-    paths:
-      - .github/**
+  push:
+    branches: [main]
 
 jobs:
-  workflow-lint:
-    uses: matcra587/github-actions/.github/workflows/workflow-lint.yml@<reviewed-commit-sha>
+  security:
+    uses: matcra587/github-actions/.github/workflows/security.yml@<reviewed-commit-sha>
     permissions:
       contents: read
     with:
@@ -43,11 +54,16 @@ jobs:
       zizmor-inputs: ./.github/
       zizmor-persona: pedantic
       zizmor-version: "1.24.1"
-      zizmor-advanced-security: false
 ```
 
 Set `zizmor-advanced-security: true` and add `security-events: write` to the
-caller job permissions only when uploading SARIF to code scanning.
+caller job permissions only when uploading SARIF to code scanning (public
+repositories, or private ones would need GHAS — the workflow suppresses the
+upload there regardless).
+
+`security.yml` replaces the retired `workflow-lint.yml`; existing consumers
+pinned to a `workflow-lint` commit SHA keep working, since reusable workflows
+resolve against the pinned commit.
 
 ### `go-release.yml`
 

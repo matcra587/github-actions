@@ -18,15 +18,14 @@ permissions:
   contents: read
 
 jobs:
-  workflow-lint:
-    name: Workflow lint
-    uses: ./.github/workflows/workflow-lint.yml
+  security:
+    name: Security
+    uses: ./.github/workflows/security.yml
     permissions:
       contents: read
     with:
       actionlint-args: |-
         -color
-      zizmor-advanced-security: false # GHAS / code scanning unavailable on this private repo.
       zizmor-inputs: ./.github/
       zizmor-persona: pedantic
       zizmor-version: "1.24.1"

@@ -16,18 +16,6 @@ on:
         description: Run `go vet ./...`.
         type: boolean
         default: true
-      govulncheck:
-        description: Run `go tool govulncheck ./...`. Consumer must include govulncheck in its go.mod tools block.
-        type: boolean
-        default: true
-      dependency-review:
-        description: Run actions/dependency-review-action. PR-only.
-        type: boolean
-        default: false
-      dependency-review-fail-on-severity:
-        description: Severity threshold passed to dependency-review.
-        type: string
-        default: high
 
 permissions: {}
 
@@ -69,27 +57,3 @@ jobs:
       - name: Vet
         if: inputs.vet
         run: go vet ./...
-
-      - name: Security check
-        if: inputs.govulncheck
-        run: go tool govulncheck ./...
-
-  dependency-review:
-    name: Dependency review
-    if: inputs.dependency-review && github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout
-        # clover: provider=auto constraint=minor tags=checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with:
-          fetch-depth: 1
-          persist-credentials: false
-
-      - name: Dependency review
-        # clover: provider=auto constraint=minor tags=dependency-review-action
-        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
-        with:
-          fail-on-severity: ${{ inputs.dependency-review-fail-on-severity }}
