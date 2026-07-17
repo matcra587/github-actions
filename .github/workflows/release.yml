@@ -11,6 +11,7 @@ on:
         options:
           - await-gates
           - homebrew-publish-formula
+          - security
           - validate-skills
       draft:
         description: Create the GitHub release as a draft.
