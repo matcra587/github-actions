@@ -3,3 +3,8 @@
 - from: bun
   jq: .packageManager
   tags: bun
+# The @biomejs/biome dep follows the biome pin in .mise.toml so the CLI in
+# node_modules matches the biome.jsonc schema version.
+- from: biome
+  jq: .devDependencies."@biomejs/biome"
+  tags: biome

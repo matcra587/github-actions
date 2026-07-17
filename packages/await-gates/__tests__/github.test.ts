@@ -37,14 +37,12 @@ describe('parseRepo', () => {
     expect(parseRepo('matcra587/docent')).toEqual(['matcra587', 'docent'])
   })
 
-  test.each([
-    'docent',
-    '/docent',
-    'matcra587/',
-    '',
-  ])('rejects malformed input %j', (input) => {
-    expect(() => parseRepo(input)).toThrow(/must be owner\/name/)
-  })
+  test.each(['docent', '/docent', 'matcra587/', ''])(
+    'rejects malformed input %j',
+    (input) => {
+      expect(() => parseRepo(input)).toThrow(/must be owner\/name/)
+    },
+  )
 })
 
 describe('octokitClient', () => {
