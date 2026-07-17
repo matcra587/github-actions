@@ -33,7 +33,9 @@ on:
       zizmor-version:
         description: zizmor version installed by zizmor-action.
         type: string
-        default: "1.24.1"
+        # 1.24.1 misparses monorepo-prefixed tag comments (homebrew/v0.1.0)
+        # as a missing version; fixed by 1.27.0.
+        default: "1.27.0"
       zizmor-online-audits:
         description: Run zizmor online audits.
         type: boolean
