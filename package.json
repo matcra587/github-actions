@@ -26,6 +26,10 @@
     "quality": "biome ci .",
     "quality:fix": "biome check --write ."
   },
+  "overrides": {
+    "fast-xml-builder": "^1.1.7",
+    "undici": "^6.27.0"
+  },
   "devDependencies": {
     "@actions/artifact": "6.2.1",
     "@actions/cache": "6.0.1",
