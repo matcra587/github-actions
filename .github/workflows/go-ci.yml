@@ -121,6 +121,7 @@ jobs:
       # Order matters: `verify` only checks modules already in the local cache,
       # so it is a no-op before `download` on a cold runner.
       - name: Download and verify deps
+        id: deps
         run: |
           go mod download
           go mod verify
@@ -136,10 +137,13 @@ jobs:
           problem-matchers: true
 
       # The action leaves golangci-lint on PATH; `run` alone does not apply the
-      # formatters section, so gofumpt drift is checked explicitly.
+      # formatters section, so gofumpt drift is checked explicitly. Gated on
+      # deps succeeding, not just `!cancelled()`: if setup failed, the linter
+      # was never installed and this reports "command not found" over the real
+      # error.
       - name: Check formatting
         if: >-
-          ${{ !cancelled()
+          ${{ !cancelled() && steps.deps.outcome == 'success'
           && !contains(format(' {0} ', inputs.skip), ' lint ') }}
         run: golangci-lint fmt --diff ./...
 
@@ -147,14 +151,14 @@ jobs:
       # into later steps.
       - name: Verify go.mod and go.sum are tidy
         if: >-
-          ${{ !cancelled()
+          ${{ !cancelled() && steps.deps.outcome == 'success'
           && !contains(format(' {0} ', inputs.skip), ' tidy ') }}
         run: go mod tidy -diff
 
       # Replaces golangci-lint's `modernize` linter -- do not enable both.
       - name: Check code is modernized
         if: >-
-          ${{ !cancelled()
+          ${{ !cancelled() && steps.deps.outcome == 'success'
           && !contains(format(' {0} ', inputs.skip), ' modernize ') }}
         run: go fix -diff ./...
 
