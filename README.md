@@ -218,8 +218,15 @@ The workflow:
 
 1.  Installs Bun `1.3.13`.
 2.  Runs `bun ci` and `bun run all`.
-3.  Fails if bundled action output differs from the committed files.
+3.  Fails if any bundled action is missing from git or differs from the
+    committed files.
 4.  Creates an immutable version tag and GitHub release for the selected commit.
+
+Versions are recorded per kind. Actions are npm packages and carry their own
+`packages/<name>/package.json`. Reusable workflows are not packages, so theirs
+live in `.github/workflow-versions.json` — bump the version there, then dispatch
+the release. `security.yml` predates this and still uses a `package.json`
+anchor; it moves separately.
 
 It does not create or move major tags such as `v1`. Release notes include the
 reviewed commit SHA; consumers should pin to that SHA.

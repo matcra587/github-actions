@@ -10,6 +10,7 @@ on:
         type: choice
         options:
           - await-gates
+          - go-ci
           - homebrew-publish-formula
           - security
           - validate-skills
@@ -75,7 +76,7 @@ jobs:
           done
           git diff --exit-code -- 'packages/*/dist/index.js'
 
-      - name: Read version from package.json
+      - name: Resolve version
         id: version
         # clover: provider=auto constraint=minor tags=github-script
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
@@ -86,24 +87,30 @@ jobs:
           script: |
             const fs = require('fs');
             const path = require('path');
-            const packageDir = process.env.PACKAGE;
+            const name = process.env.PACKAGE;
+            const root = process.env.GITHUB_WORKSPACE;
             // Tag prefix mapping: short alias for homebrew-publish-formula
-            // (backward-compat with existing tags), package dir name otherwise.
-            const tagPrefix = packageDir === 'homebrew-publish-formula'
+            // (backward-compat with existing tags), name otherwise.
+            const tagPrefix = name === 'homebrew-publish-formula'
               ? 'homebrew'
-              : packageDir;
-            const pkg = JSON.parse(
-              fs.readFileSync(
-                path.join(
-                  process.env.GITHUB_WORKSPACE,
-                  `packages/${packageDir}/package.json`,
-                ),
-                'utf8',
-              ),
+              : name;
+            // Actions are npm packages and carry their own version. Reusable
+            // workflows are not packages, so theirs live in a map rather than
+            // an empty workspace member.
+            const pkgPath = path.join(root, `packages/${name}/package.json`);
+            const map = JSON.parse(
+              fs.readFileSync(path.join(root, '.github/workflow-versions.json'), 'utf8'),
             );
-            const version = pkg.version;
+            const hasPkg = fs.existsSync(pkgPath);
+            if (hasPkg && map[name]) {
+              core.setFailed(`${name} has a version in both packages/${name}/package.json and .github/workflow-versions.json; remove one.`);
+              return;
+            }
+            const version = hasPkg
+              ? JSON.parse(fs.readFileSync(pkgPath, 'utf8')).version
+              : map[name];
             if (!/^\d+\.\d+\.\d+(-[0-9A-Za-z][0-9A-Za-z.-]*)?$/.test(version)) {
-              core.setFailed(`package.json version must be SemVer (got: ${version})`);
+              core.setFailed(`${name} version must be SemVer (got: ${version})`);
               return;
             }
             return `${tagPrefix}/v${version}`;
