@@ -65,9 +65,15 @@ jobs:
         run: bun run all
 
       - name: Ensure bundled actions are committed
-        run: git diff --exit-code -- "packages/${PACKAGE}/dist/index.js"
-        env:
-          PACKAGE: ${{ inputs.package }}
+        # Presence first: `git diff` on a never-committed bundle is
+        # vacuously clean, which is how a missing dist shipped once.
+        # Checks every bundle, not just the released one -- scoping it to
+        # one package made it a silent no-op for any name with no dist.
+        run: |
+          for bundle in packages/*/dist/index.js; do
+            git ls-files --error-unmatch "${bundle}"
+          done
+          git diff --exit-code -- 'packages/*/dist/index.js'
 
       - name: Read version from package.json
         id: version
