@@ -78,6 +78,104 @@ regardless).
 pinned to a `workflow-lint` commit SHA keep working, since reusable workflows
 resolve against the pinned commit.
 
+### `go-ci.yml`
+
+One Go pipeline for every Go repo. Five working jobs — `lint`, `test`,
+`cross-compile`, `race`, and an input `validate` — plus a `go-ci` job that
+aggregates them into a single check.
+
+It owns the canonical `go test` flags — `-shuffle=on` everywhere, `-race` and
+`-coverpkg` in the dedicated job — so adding a flag once applies it to every
+consumer that does not override them. **`test-args` and `race-args` replace the
+defaults wholesale rather than appending**, so a caller passing
+`test-args: "-run TestFoo ./..."` silently loses `-shuffle=on`. Prefer `skip`
+over narrowing the args.
+
+*   `os` and `go-versions` are JSON arrays. An empty `go-versions` entry falls
+    back to `go-version-file`, so `'["", "stable"]'` tests the pinned toolchain
+    plus the current stable release. `fail-fast: false`, so one failing cell
+    never cancels the rest.
+*   `lint` has no separate `go vet` step: golangci-lint's `default: standard`
+    set already includes `govet`. (`cross-compile` does run it, for a reason
+    given below.) `go build` *is* run per-OS, since build tags and syscalls do
+    differ across platforms.
+*   Race and coverage share one job. Coverage lands in the job summary and as
+    an artifact; `coverage-threshold` gates the total locally, with no
+    third-party uploader.
+*   The `lint` job also runs the `fmt --diff`, `go mod tidy -diff` and
+    `go fix -diff ./...` checks. Each carries `!cancelled()`, so a golangci-lint
+    failure does not hide the other three.
+*   `go fix -diff` **replaces golangci-lint's `modernize` linter** — remove it
+    from `.golangci.yml` when migrating rather than running both. Repos that
+    already ran the linter should see close to nothing; repos that didn't will
+    have a backlog to clear with `go fix ./...` first.
+*   `cross-compile-targets` runs `go build` **and** `go vet` for each
+    `GOOS/GOARCH` pair, so a broken target surfaces on the PR rather than at
+    release (`vet` because `build` alone does not typecheck `_test.go` files for
+    the target). Caveat: it verifies a plain `CGO_ENABLED=0 go build`, **not**
+    the GoReleaser build that actually ships, so release-only flags or tags can
+    still break at tag time.
+*   `setup-go` exports `GOTOOLCHAIN=local`, so a `go` or `toolchain` directive
+    in `go.mod` never pulls a different toolchain than the one installed. One
+    consequence: a `go-versions` entry older than `go.mod`'s `go` line fails
+    loudly rather than silently upgrading itself, and `"stable"` is a duplicate
+    cell whenever the pinned version already is stable.
+
+To force a check off, pass `skip` — a whitespace-separated list of
+`lint`, `tidy`, `modernize`, `test`, `race`, `cross-compile`. Entries are
+verified; an unknown name fails the workflow rather than silently leaving the
+check running. Note `tidy` and `modernize` are steps inside the `lint` job, not
+jobs of their own.
+
+```yaml
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'push' && github.sha || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    uses: matcra587/github-actions/.github/workflows/go-ci.yml@<reviewed-commit-sha>
+    permissions:
+      contents: read
+    with:
+      os: '["ubuntu-latest", "macos-latest", "windows-latest"]'
+      go-versions: '["", "stable"]'
+      cross-compile-targets: '["darwin/arm64", "linux/arm64", "windows/amd64"]'
+      coverage-threshold: 60
+```
+
+The `concurrency` block is the caller's job, not this workflow's. Keying push
+runs on the SHA rather than the ref means rapid pushes cancel each other's PR
+runs but never cancel a gate that a release tag is waiting on.
+
+**Caller contract:** the test jobs run `go test ./...` with no build tags, so
+any suite that touches a network service, a live API, or a container must be
+behind a build tag (`//go:build integration`, `live`, and so on) or it will run
+on every pull request.
+
+**Require the `go-ci` check in branch protection, not the individual jobs.**
+Matrix legs produce per-cell check names that change whenever a caller edits
+`os` or `go-versions`, and `skip`ped jobs never report at all — so neither can
+be required directly without breaking the ruleset. The `required` job
+aggregates them into one stable check that fails if any job failed or was
+cancelled, and passes when a job was deliberately skipped.
+
+Security scanning stays in `security.yml`; nothing here duplicates it.
+
+Commands run directly rather than through `mise run`. GitHub caps annotations
+at ten per step and mise emits no `::group::` or `::error::` markers, so folding
+the pipeline into one task step costs inline PR feedback, collapsible logs and
+log search.
+
+`go-ci.yml` replaces the retired `go-test.yml` and `go-lint.yml`; existing
+consumers pinned to those commit SHAs keep working, since reusable workflows
+resolve against the pinned commit.
+
 ### `go-release.yml`
 
 Publishes a Go package release on a version-tag push: waits for the caller's

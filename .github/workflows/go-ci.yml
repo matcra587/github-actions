@@ -1,0 +1,365 @@
+---
+name: go-ci
+
+on:
+  workflow_call:
+    inputs:
+      go-version-file:
+        description: File to read the primary Go version from.
+        type: string
+        default: go.mod
+      go-versions:
+        description: >-
+          JSON array of Go versions for the test matrix. An empty string entry
+          uses go-version-file instead.
+        type: string
+        default: '[""]'
+      os:
+        description: JSON array of runner labels for the test matrix.
+        type: string
+        default: '["ubuntu-latest"]'
+      test-args:
+        description: >-
+          Arguments passed to `go test` in the platform matrix. Replaces the
+          default rather than adding to it.
+        type: string
+        default: "-shuffle=on ./..."
+      race-args:
+        description: >-
+          Arguments passed to `go test` in the race job. Replaces the default
+          rather than adding to it. -coverprofile and -covermode are appended
+          by the job.
+        type: string
+        default: "-race -shuffle=on -count=1 -coverpkg=./... ./..."
+      coverage-threshold:
+        description: >-
+          Minimum total coverage percent. 0 reports the number without failing.
+          Gates the total, not the diff.
+        type: number
+        default: 0
+      golangci-version:
+        description: >-
+          golangci-lint version. Keep in sync with the repo's .mise.toml pin.
+        type: string
+        # clover: provider=github repository=golangci/golangci-lint constraint=minor tags=golangci-lint,github
+        default: "v2.12.2"
+      timeout:
+        description: golangci-lint timeout (e.g. 5m).
+        type: string
+        default: "5m"
+      cross-compile-targets:
+        description: >-
+          JSON array of GOOS/GOARCH pairs to build and vet, e.g.
+          '["darwin/arm64", "windows/amd64"]'. Empty disables the job.
+        type: string
+        default: "[]"
+      skip:
+        description: >-
+          Jobs to skip, whitespace-separated. Entries are verified -- unknown
+          names fail the workflow. Allowed values are lint, tidy, modernize,
+          test, race, and cross-compile.
+        type: string
+        default: ""
+
+permissions: {}
+
+jobs:
+  # Mirrors security.yml: an unknown skip entry fails loudly rather than
+  # silently leaving a check running.
+  validate:
+    name: validate inputs
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Verify skip entries
+        run: |
+          allowed="lint tidy modernize test race cross-compile"
+          unknown=""
+          for name in ${SKIP}; do
+            case " ${allowed} " in
+              *" ${name} "*) ;;
+              *) unknown="${unknown}${unknown:+, }${name}" ;;
+            esac
+          done
+          if [ -n "${unknown}" ]; then
+            echo "::error::Unknown skip entries: ${unknown}. Allowed: $(echo "${allowed}" | tr ' ' ',' | sed 's/,/, /g')."
+            exit 1
+          fi
+          echo "skip entries valid: ${SKIP:-(none)}"
+        shell: bash
+        env:
+          SKIP: ${{ inputs.skip }}
+
+  # `!cancelled()` on each step so lint, tidy and modernize all report in one
+  # run instead of the first failure hiding the rest.
+  lint:
+    name: lint
+    if: >-
+      ${{ !contains(format(' {0} ', inputs.skip), ' lint ')
+      || !contains(format(' {0} ', inputs.skip), ' tidy ')
+      || !contains(format(' {0} ', inputs.skip), ' modernize ') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        # clover: provider=auto constraint=minor tags=checkout,github
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up Go
+        # clover: provider=auto constraint=minor tags=setup-go,github
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: ${{ inputs.go-version-file }}
+          cache: true
+
+      # Order matters: `verify` only checks modules already in the local cache,
+      # so it is a no-op before `download` on a cold runner.
+      - name: Download and verify deps
+        run: |
+          go mod download
+          go mod verify
+
+      # No separate `go vet`: the `standard` linter set already includes govet.
+      - name: Run golangci-lint
+        if: ${{ !contains(format(' {0} ', inputs.skip), ' lint ') }}
+        # clover: provider=auto constraint=minor tags=golangci-lint-action,github
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+        with:
+          version: ${{ inputs.golangci-version }}
+          args: --timeout=${{ inputs.timeout }}
+          problem-matchers: true
+
+      # The action leaves golangci-lint on PATH; `run` alone does not apply the
+      # formatters section, so gofumpt drift is checked explicitly.
+      - name: Check formatting
+        if: >-
+          ${{ !cancelled()
+          && !contains(format(' {0} ', inputs.skip), ' lint ') }}
+        run: golangci-lint fmt --diff ./...
+
+      # `-diff` reports without modifying the tree, so no dirty state leaks
+      # into later steps.
+      - name: Verify go.mod and go.sum are tidy
+        if: >-
+          ${{ !cancelled()
+          && !contains(format(' {0} ', inputs.skip), ' tidy ') }}
+        run: go mod tidy -diff
+
+      # Replaces golangci-lint's `modernize` linter -- do not enable both.
+      - name: Check code is modernized
+        if: >-
+          ${{ !cancelled()
+          && !contains(format(' {0} ', inputs.skip), ' modernize ') }}
+        run: go fix -diff ./...
+
+  test:
+    name: test
+    if: ${{ !contains(format(' {0} ', inputs.skip), ' test ') }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ fromJSON(inputs.os) }}
+        go: ${{ fromJSON(inputs.go-versions) }}
+    # This is the only job that runs on non-Linux runners. Without this, a
+    # multiline `run:` uses pwsh on Windows, where only the LAST command's exit
+    # code fails the step -- an earlier failure is silently swallowed.
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        # clover: provider=auto constraint=minor tags=checkout,github
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up Go
+        # clover: provider=auto constraint=minor tags=setup-go,github
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          # go-version wins when set; an empty matrix entry falls back to the file.
+          go-version: ${{ matrix.go }}
+          go-version-file: ${{ inputs.go-version-file }}
+          cache: true
+
+      - name: Download and verify deps
+        run: |
+          go mod download
+          go mod verify
+
+      - name: Build
+        run: go build ./...
+
+      - name: Test
+        run: |
+          read -ra args <<< "${TEST_ARGS}"
+          go test "${args[@]}"
+        env:
+          TEST_ARGS: ${{ inputs.test-args }}
+
+  cross-compile:
+    name: cross-compile
+    if: >-
+      ${{ inputs.cross-compile-targets != '[]'
+      && !contains(format(' {0} ', inputs.skip), ' cross-compile ') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        # clover: provider=auto constraint=minor tags=checkout,github
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up Go
+        # clover: provider=auto constraint=minor tags=setup-go,github
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: ${{ inputs.go-version-file }}
+          cache: true
+
+      # `go vet` too: `go build` does not typecheck _test.go for the target.
+      - name: Build and vet each target
+        run: |
+          failed=""
+          while IFS= read -r target; do
+            [ -n "${target}" ] || continue
+            GOOS="${target%%/*}"
+            GOARCH="${target##*/}"
+            export GOOS GOARCH
+            echo "::group::${GOOS}/${GOARCH}"
+            if go build ./... && go vet ./...; then
+              echo "ok"
+            else
+              echo "::error::cross-compile failed for ${GOOS}/${GOARCH}"
+              failed="${failed} ${GOOS}/${GOARCH}"
+            fi
+            echo "::endgroup::"
+          done <<<"$(printf '%s' "${TARGETS}" | jq -r '.[]')"
+          if [ -n "${failed}" ]; then
+            echo "::error::failing targets:${failed}"
+            exit 1
+          fi
+        shell: bash
+        env:
+          CGO_ENABLED: "0"
+          TARGETS: ${{ inputs.cross-compile-targets }}
+
+  race:
+    name: race
+    if: ${{ !contains(format(' {0} ', inputs.skip), ' race ') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      CGO_ENABLED: "1"
+    steps:
+      - name: Checkout
+        # clover: provider=auto constraint=minor tags=checkout,github
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up Go
+        # clover: provider=auto constraint=minor tags=setup-go,github
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: ${{ inputs.go-version-file }}
+          cache: true
+
+      - name: Download and verify deps
+        run: |
+          go mod download
+          go mod verify
+
+      # `-p 2`: -p and -parallel both default to GOMAXPROCS, and -race costs
+      # 5-10x memory per binary -- the product OOM-kills the runner.
+      # -count=1 stays in race-args despite -shuffle: golang/go#74873 lets
+      # cached results merge with fresh coverage and emit stale line ranges.
+      - name: Test with race detector and coverage
+        run: |
+          read -ra args <<< "${RACE_ARGS}"
+          go test -p 2 "${args[@]}" -coverprofile=coverage.out -covermode=atomic
+        shell: bash
+        env:
+          RACE_ARGS: ${{ inputs.race-args }}
+
+      - name: Report coverage
+        id: coverage
+        run: |
+          go tool cover -html=coverage.out -o coverage.html
+          total="$(go tool cover -func=coverage.out | awk '/^total:/ {print $3}')"
+          echo "total=${total}" >>"${GITHUB_OUTPUT}"
+          {
+            printf '### Coverage: %s\n\n' "${total}"
+            printf '```\n'
+            go tool cover -func=coverage.out | tail -n 20
+            printf '```\n'
+          } >>"${GITHUB_STEP_SUMMARY}"
+        shell: bash
+
+      - name: Enforce coverage threshold
+        if: ${{ inputs.coverage-threshold > 0 }}
+        run: |
+          actual="${TOTAL%\%}"
+          if awk -v a="${actual}" -v t="${THRESHOLD}" 'BEGIN { exit !(a < t) }'; then
+            echo "::error::Coverage ${actual}% is below threshold ${THRESHOLD}%"
+            exit 1
+          fi
+          echo "Coverage ${actual}% meets threshold ${THRESHOLD}%"
+        shell: bash
+        env:
+          TOTAL: ${{ steps.coverage.outputs.total }}
+          THRESHOLD: ${{ inputs.coverage-threshold }}
+
+      - name: Upload coverage
+        if: ${{ !cancelled() }}
+        # clover: provider=auto constraint=minor tags=upload-artifact,github
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: coverage
+          path: |
+            coverage.out
+            coverage.html
+          retention-days: 7
+
+  # The single check branch protection should require: matrix legs produce
+  # per-cell names that change with the caller's inputs, and skipped jobs never
+  # report. `always()` because success()/failure() skip when a need skips.
+  required:
+    name: go-ci
+    if: ${{ always() }}
+    needs: [validate, lint, test, cross-compile, race]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions: {}
+    steps:
+      - name: Check job results
+        run: |
+          failed="$(printf '%s' "${NEEDS}" \
+            | jq -r 'with_entries(select(.value.result == "failure"
+                     or .value.result == "cancelled")) | keys[]')"
+          if [ -n "${failed}" ]; then
+            echo "::error::failing jobs: $(echo "${failed}" | tr '\n' ' ')"
+            exit 1
+          fi
+          echo "All required jobs passed or were skipped."
+        shell: bash
+        env:
+          NEEDS: ${{ toJson(needs) }}
