@@ -53,13 +53,25 @@ on:
           '["darwin/arm64", "windows/amd64"]'. Empty disables the job.
         type: string
         default: "[]"
-      skip:
+      goprivate:
         description: >-
-          Jobs to skip, whitespace-separated. Entries are verified -- unknown
-          names fail the workflow. Allowed values are lint, tidy, modernize,
-          test, race, and cross-compile.
+          GOPRIVATE glob for private module paths, e.g. github.com/org/*. When
+          set, git is configured to fetch matching paths with a token.
         type: string
         default: ""
+      skip:
+        description: >-
+          Jobs and checks to skip, whitespace-separated. Entries are verified
+          -- unknown names fail the workflow. Allowed values are deps, lint,
+          tidy, modernize, test, race, and cross-compile.
+        type: string
+        default: ""
+    secrets:
+      MODULE_TOKEN:
+        description: >-
+          Token for private modules in other repositories. Defaults to the
+          caller's GITHUB_TOKEN, which only reaches the calling repo.
+        required: false
 
 permissions: {}
 
@@ -74,7 +86,7 @@ jobs:
     steps:
       - name: Verify skip entries
         run: |
-          allowed="lint tidy modernize test race cross-compile"
+          allowed="deps lint tidy modernize test race cross-compile"
           unknown=""
           for name in ${SKIP}; do
             case " ${allowed} " in
@@ -91,8 +103,9 @@ jobs:
         env:
           SKIP: ${{ inputs.skip }}
 
-  # `!cancelled()` on each step so lint, tidy and modernize all report in one
-  # run instead of the first failure hiding the rest.
+  # The fmt/tidy/modernize steps run even when golangci-lint fails, so all
+  # four report in one run -- but not when deps failed, which would leave the
+  # linter uninstalled.
   lint:
     name: lint
     if: >-
@@ -103,6 +116,8 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: read
+    env:
+      GOPRIVATE: ${{ inputs.goprivate }}
     steps:
       - name: Checkout
         # clover: provider=auto constraint=minor tags=checkout,github
@@ -110,6 +125,20 @@ jobs:
         with:
           fetch-depth: 1
           persist-credentials: false
+
+      # Fetch private module paths over HTTPS with a token. Both candidates go
+      # through env -- never interpolated into the script -- and the choice is
+      # made in shell so an unset optional secret is simply an empty string.
+      - name: Configure private module access
+        if: ${{ inputs.goprivate != '' }}
+        run: |
+          token="${MODULE_TOKEN:-${DEFAULT_TOKEN}}"
+          git config --global \
+            url."https://x-access-token:${token}@github.com/".insteadOf "https://github.com/"
+        shell: bash
+        env:
+          DEFAULT_TOKEN: ${{ github.token }}
+          MODULE_TOKEN: ${{ secrets.MODULE_TOKEN }}
 
       - name: Set up Go
         # clover: provider=auto constraint=minor tags=setup-go,github
@@ -122,6 +151,7 @@ jobs:
       # so it is a no-op before `download` on a cold runner.
       - name: Download and verify deps
         id: deps
+        if: ${{ !contains(format(' {0} ', inputs.skip), ' deps ') }}
         run: |
           go mod download
           go mod verify
@@ -143,7 +173,7 @@ jobs:
       # error.
       - name: Check formatting
         if: >-
-          ${{ !cancelled() && steps.deps.outcome == 'success'
+          ${{ !cancelled() && steps.deps.outcome != 'failure'
           && !contains(format(' {0} ', inputs.skip), ' lint ') }}
         run: golangci-lint fmt --diff ./...
 
@@ -151,14 +181,15 @@ jobs:
       # into later steps.
       - name: Verify go.mod and go.sum are tidy
         if: >-
-          ${{ !cancelled() && steps.deps.outcome == 'success'
+          ${{ !cancelled() && steps.deps.outcome != 'failure'
           && !contains(format(' {0} ', inputs.skip), ' tidy ') }}
         run: go mod tidy -diff
 
       # Replaces golangci-lint's `modernize` linter -- do not enable both.
+      # Requires Go 1.26: `go fix` gained -diff there. Skip on older toolchains.
       - name: Check code is modernized
         if: >-
-          ${{ !cancelled() && steps.deps.outcome == 'success'
+          ${{ !cancelled() && steps.deps.outcome != 'failure'
           && !contains(format(' {0} ', inputs.skip), ' modernize ') }}
         run: go fix -diff ./...
 
@@ -174,6 +205,8 @@ jobs:
       matrix:
         os: ${{ fromJSON(inputs.os) }}
         go: ${{ fromJSON(inputs.go-versions) }}
+    env:
+      GOPRIVATE: ${{ inputs.goprivate }}
     # This is the only job that runs on non-Linux runners. Without this, a
     # multiline `run:` uses pwsh on Windows, where only the LAST command's exit
     # code fails the step -- an earlier failure is silently swallowed.
@@ -188,6 +221,20 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
+      # Fetch private module paths over HTTPS with a token. Both candidates go
+      # through env -- never interpolated into the script -- and the choice is
+      # made in shell so an unset optional secret is simply an empty string.
+      - name: Configure private module access
+        if: ${{ inputs.goprivate != '' }}
+        run: |
+          token="${MODULE_TOKEN:-${DEFAULT_TOKEN}}"
+          git config --global \
+            url."https://x-access-token:${token}@github.com/".insteadOf "https://github.com/"
+        shell: bash
+        env:
+          DEFAULT_TOKEN: ${{ github.token }}
+          MODULE_TOKEN: ${{ secrets.MODULE_TOKEN }}
+
       - name: Set up Go
         # clover: provider=auto constraint=minor tags=setup-go,github
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -198,6 +245,7 @@ jobs:
           cache: true
 
       - name: Download and verify deps
+        if: ${{ !contains(format(' {0} ', inputs.skip), ' deps ') }}
         run: |
           go mod download
           go mod verify
@@ -221,6 +269,8 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: read
+    env:
+      GOPRIVATE: ${{ inputs.goprivate }}
     steps:
       - name: Checkout
         # clover: provider=auto constraint=minor tags=checkout,github
@@ -228,6 +278,20 @@ jobs:
         with:
           fetch-depth: 1
           persist-credentials: false
+
+      # Fetch private module paths over HTTPS with a token. Both candidates go
+      # through env -- never interpolated into the script -- and the choice is
+      # made in shell so an unset optional secret is simply an empty string.
+      - name: Configure private module access
+        if: ${{ inputs.goprivate != '' }}
+        run: |
+          token="${MODULE_TOKEN:-${DEFAULT_TOKEN}}"
+          git config --global \
+            url."https://x-access-token:${token}@github.com/".insteadOf "https://github.com/"
+        shell: bash
+        env:
+          DEFAULT_TOKEN: ${{ github.token }}
+          MODULE_TOKEN: ${{ secrets.MODULE_TOKEN }}
 
       - name: Set up Go
         # clover: provider=auto constraint=minor tags=setup-go,github
@@ -272,6 +336,7 @@ jobs:
       contents: read
     env:
       CGO_ENABLED: "1"
+      GOPRIVATE: ${{ inputs.goprivate }}
     steps:
       - name: Checkout
         # clover: provider=auto constraint=minor tags=checkout,github
@@ -279,6 +344,20 @@ jobs:
         with:
           fetch-depth: 1
           persist-credentials: false
+
+      # Fetch private module paths over HTTPS with a token. Both candidates go
+      # through env -- never interpolated into the script -- and the choice is
+      # made in shell so an unset optional secret is simply an empty string.
+      - name: Configure private module access
+        if: ${{ inputs.goprivate != '' }}
+        run: |
+          token="${MODULE_TOKEN:-${DEFAULT_TOKEN}}"
+          git config --global \
+            url."https://x-access-token:${token}@github.com/".insteadOf "https://github.com/"
+        shell: bash
+        env:
+          DEFAULT_TOKEN: ${{ github.token }}
+          MODULE_TOKEN: ${{ secrets.MODULE_TOKEN }}
 
       - name: Set up Go
         # clover: provider=auto constraint=minor tags=setup-go,github
@@ -288,6 +367,7 @@ jobs:
           cache: true
 
       - name: Download and verify deps
+        if: ${{ !contains(format(' {0} ', inputs.skip), ' deps ') }}
         run: |
           go mod download
           go mod verify

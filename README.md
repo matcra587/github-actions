@@ -121,11 +121,33 @@ over narrowing the args.
     loudly rather than silently upgrading itself, and `"stable"` is a duplicate
     cell whenever the pinned version already is stable.
 
-To force a check off, pass `skip` — a whitespace-separated list of
+To force a check off, pass `skip` — a whitespace-separated list of `deps`,
 `lint`, `tidy`, `modernize`, `test`, `race`, `cross-compile`. Entries are
 verified; an unknown name fails the workflow rather than silently leaving the
-check running. Note `tidy` and `modernize` are steps inside the `lint` job, not
-jobs of their own.
+check running. Note `deps`, `tidy` and `modernize` are steps inside the `lint`
+job, not jobs of their own.
+
+**Private modules.** `go mod download` and `go mod tidy` ignore `go.work` and
+resolve module requirements over the network, so a repo with private module
+paths must set `goprivate`:
+
+```yaml
+    with:
+      goprivate: github.com/myorg/*
+```
+
+That keeps matching paths off the module proxy and checksum database, and
+configures git to fetch them with a token. The default token is the caller's
+`GITHUB_TOKEN`, which only reaches the calling repo — for private modules in
+*other* repositories, pass a PAT or App token:
+
+```yaml
+    secrets:
+      MODULE_TOKEN: ${{ secrets.MY_PAT }}
+```
+
+**Go 1.26 is required for `modernize`.** `go fix` gained `-diff` in 1.26; skip
+that check on older toolchains.
 
 ```yaml
 on:
