@@ -125,7 +125,8 @@ To force a check off, pass `skip` — a whitespace-separated list of `deps`,
 `lint`, `tidy`, `modernize`, `test`, `race`, `cross-compile`. Entries are
 verified; an unknown name fails the workflow rather than silently leaving the
 check running. Note `deps`, `tidy` and `modernize` are steps inside the `lint`
-job, not jobs of their own.
+job, not jobs of their own. Validation runs first and everything else waits on
+it, so a typo costs one short job rather than a full matrix.
 
 **Private modules.** `go mod download` and `go mod tidy` ignore `go.work` and
 resolve module requirements over the network, so a repo with private module

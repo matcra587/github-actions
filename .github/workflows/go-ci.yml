@@ -76,8 +76,6 @@ on:
 permissions: {}
 
 jobs:
-  # Mirrors security.yml: an unknown skip entry fails loudly rather than
-  # silently leaving a check running.
   validate:
     name: validate inputs
     runs-on: ubuntu-latest
@@ -103,9 +101,6 @@ jobs:
         env:
           SKIP: ${{ inputs.skip }}
 
-  # The fmt/tidy/modernize steps run even when golangci-lint fails, so all
-  # four report in one run -- but not when deps failed, which would leave the
-  # linter uninstalled.
   lint:
     name: lint
     if: >-
@@ -114,6 +109,7 @@ jobs:
       || !contains(format(' {0} ', inputs.skip), ' modernize ') }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    needs: validate
     permissions:
       contents: read
     env:
@@ -126,9 +122,7 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
-      # Fetch private module paths over HTTPS with a token. Both candidates go
-      # through env -- never interpolated into the script -- and the choice is
-      # made in shell so an unset optional secret is simply an empty string.
+      # Tokens via env, never interpolated into the script body.
       - name: Configure private module access
         if: ${{ inputs.goprivate != '' }}
         run: |
@@ -167,18 +161,14 @@ jobs:
           problem-matchers: true
 
       # The action leaves golangci-lint on PATH; `run` alone does not apply the
-      # formatters section, so gofumpt drift is checked explicitly. Gated on
-      # deps succeeding, not just `!cancelled()`: if setup failed, the linter
-      # was never installed and this reports "command not found" over the real
-      # error.
+      # formatters section. Gated on deps, not just `!cancelled()`: a failed
+      # setup leaves the linter uninstalled and this reports exit 127 instead.
       - name: Check formatting
         if: >-
           ${{ !cancelled() && steps.deps.outcome != 'failure'
           && !contains(format(' {0} ', inputs.skip), ' lint ') }}
         run: golangci-lint fmt --diff ./...
 
-      # `-diff` reports without modifying the tree, so no dirty state leaks
-      # into later steps.
       - name: Verify go.mod and go.sum are tidy
         if: >-
           ${{ !cancelled() && steps.deps.outcome != 'failure'
@@ -198,6 +188,7 @@ jobs:
     if: ${{ !contains(format(' {0} ', inputs.skip), ' test ') }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
+    needs: validate
     permissions:
       contents: read
     strategy:
@@ -221,9 +212,7 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
-      # Fetch private module paths over HTTPS with a token. Both candidates go
-      # through env -- never interpolated into the script -- and the choice is
-      # made in shell so an unset optional secret is simply an empty string.
+      # Tokens via env, never interpolated into the script body.
       - name: Configure private module access
         if: ${{ inputs.goprivate != '' }}
         run: |
@@ -267,6 +256,7 @@ jobs:
       && !contains(format(' {0} ', inputs.skip), ' cross-compile ') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    needs: validate
     permissions:
       contents: read
     env:
@@ -279,9 +269,7 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
-      # Fetch private module paths over HTTPS with a token. Both candidates go
-      # through env -- never interpolated into the script -- and the choice is
-      # made in shell so an unset optional secret is simply an empty string.
+      # Tokens via env, never interpolated into the script body.
       - name: Configure private module access
         if: ${{ inputs.goprivate != '' }}
         run: |
@@ -332,6 +320,7 @@ jobs:
     if: ${{ !contains(format(' {0} ', inputs.skip), ' race ') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    needs: validate
     permissions:
       contents: read
     env:
@@ -345,9 +334,7 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
-      # Fetch private module paths over HTTPS with a token. Both candidates go
-      # through env -- never interpolated into the script -- and the choice is
-      # made in shell so an unset optional secret is simply an empty string.
+      # Tokens via env, never interpolated into the script body.
       - name: Configure private module access
         if: ${{ inputs.goprivate != '' }}
         run: |
