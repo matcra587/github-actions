@@ -71,6 +71,8 @@ on:
         description: >-
           Token for private modules in other repositories. Defaults to the
           caller's GITHUB_TOKEN, which only reaches the calling repo.
+          Dependabot-triggered runs read secrets from the Dependabot secrets
+          store -- configure it there as well.
         required: false
 
 permissions: {}
@@ -134,6 +136,13 @@ jobs:
       - name: Configure private module access
         if: ${{ inputs.goprivate != '' }}
         run: |
+          # Dependabot-triggered runs resolve secrets from the Dependabot
+          # store; an unset MODULE_TOKEN silently falls back to github.token,
+          # which only reaches this repo. Warn rather than fail: the fallback
+          # is legitimate when goprivate covers nothing outside this repo.
+          if [ "${GITHUB_ACTOR}" = "dependabot[bot]" ] && [ -z "${MODULE_TOKEN}" ]; then
+            echo "::warning::MODULE_TOKEN is empty on a Dependabot run -- if the module fetch fails below, add MODULE_TOKEN to the repository's Dependabot secrets."
+          fi
           token="${MODULE_TOKEN:-${DEFAULT_TOKEN}}"
           git config --global \
             url."https://x-access-token:${token}@github.com/".insteadOf "https://github.com/"
@@ -224,6 +233,13 @@ jobs:
       - name: Configure private module access
         if: ${{ inputs.goprivate != '' }}
         run: |
+          # Dependabot-triggered runs resolve secrets from the Dependabot
+          # store; an unset MODULE_TOKEN silently falls back to github.token,
+          # which only reaches this repo. Warn rather than fail: the fallback
+          # is legitimate when goprivate covers nothing outside this repo.
+          if [ "${GITHUB_ACTOR}" = "dependabot[bot]" ] && [ -z "${MODULE_TOKEN}" ]; then
+            echo "::warning::MODULE_TOKEN is empty on a Dependabot run -- if the module fetch fails below, add MODULE_TOKEN to the repository's Dependabot secrets."
+          fi
           token="${MODULE_TOKEN:-${DEFAULT_TOKEN}}"
           git config --global \
             url."https://x-access-token:${token}@github.com/".insteadOf "https://github.com/"
@@ -281,6 +297,13 @@ jobs:
       - name: Configure private module access
         if: ${{ inputs.goprivate != '' }}
         run: |
+          # Dependabot-triggered runs resolve secrets from the Dependabot
+          # store; an unset MODULE_TOKEN silently falls back to github.token,
+          # which only reaches this repo. Warn rather than fail: the fallback
+          # is legitimate when goprivate covers nothing outside this repo.
+          if [ "${GITHUB_ACTOR}" = "dependabot[bot]" ] && [ -z "${MODULE_TOKEN}" ]; then
+            echo "::warning::MODULE_TOKEN is empty on a Dependabot run -- if the module fetch fails below, add MODULE_TOKEN to the repository's Dependabot secrets."
+          fi
           token="${MODULE_TOKEN:-${DEFAULT_TOKEN}}"
           git config --global \
             url."https://x-access-token:${token}@github.com/".insteadOf "https://github.com/"
@@ -346,6 +369,13 @@ jobs:
       - name: Configure private module access
         if: ${{ inputs.goprivate != '' }}
         run: |
+          # Dependabot-triggered runs resolve secrets from the Dependabot
+          # store; an unset MODULE_TOKEN silently falls back to github.token,
+          # which only reaches this repo. Warn rather than fail: the fallback
+          # is legitimate when goprivate covers nothing outside this repo.
+          if [ "${GITHUB_ACTOR}" = "dependabot[bot]" ] && [ -z "${MODULE_TOKEN}" ]; then
+            echo "::warning::MODULE_TOKEN is empty on a Dependabot run -- if the module fetch fails below, add MODULE_TOKEN to the repository's Dependabot secrets."
+          fi
           token="${MODULE_TOKEN:-${DEFAULT_TOKEN}}"
           git config --global \
             url."https://x-access-token:${token}@github.com/".insteadOf "https://github.com/"

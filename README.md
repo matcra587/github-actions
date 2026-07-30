@@ -148,6 +148,12 @@ configures git to fetch them with a token. The default token is the caller's
       MODULE_TOKEN: ${{ secrets.MY_PAT }}
 ```
 
+Dependabot-triggered runs read secrets from the repository's *Dependabot*
+secrets store, not the Actions one, so `MODULE_TOKEN` must be configured there
+too. When it is missing on a Dependabot run the workflow emits a warning and
+falls back to `GITHUB_TOKEN` — enough when `goprivate` covers nothing outside
+the calling repo, a `go mod download` failure otherwise.
+
 **Go 1.26 is required for `modernize`.** `go fix` gained `-diff` in 1.26; skip
 that check on older toolchains.
 
