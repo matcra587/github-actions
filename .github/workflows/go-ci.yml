@@ -28,9 +28,10 @@ on:
         description: >-
           Arguments passed to `go test` in the race job. Replaces the default
           rather than adding to it. -coverprofile and -covermode are appended
-          by the job.
+          by the job. The default includes -p 2 to bound race-instrumented
+          memory; drop it when the suite needs the parallelism.
         type: string
-        default: "-race -shuffle=on -count=1 -coverpkg=./... ./..."
+        default: "-race -shuffle=on -count=1 -coverpkg=./... -p 2 ./..."
       coverage-threshold:
         description: >-
           Minimum total coverage percent. 0 reports the number without failing.
@@ -178,8 +179,9 @@ jobs:
           problem-matchers: true
 
       # The action leaves golangci-lint on PATH; `run` alone does not apply the
-      # formatters section. Gated on deps, not just `!cancelled()`: a failed
-      # setup leaves the linter uninstalled and this reports exit 127 instead.
+      # formatters section. Gated on deps: a broken module download would only
+      # produce spurious diffs here. (If setup-go itself fails, deps is skipped
+      # -- outcome 'skipped' passes this gate, but the job is already red.)
       - name: Check formatting
         if: >-
           ${{ !cancelled() && steps.deps.outcome != 'failure'
@@ -397,14 +399,19 @@ jobs:
           go mod download
           go mod verify
 
-      # `-p 2`: -p and -parallel both default to GOMAXPROCS, and -race costs
-      # 5-10x memory per binary -- the product OOM-kills the runner.
-      # -count=1 stays in race-args despite -shuffle: golang/go#74873 lets
-      # cached results merge with fresh coverage and emit stale line ranges.
+      # -p 2 lives in the default race-args: -p and -parallel both default to
+      # GOMAXPROCS, and -race costs 5-10x memory per binary. Private-repo
+      # runners (2 vCPU/8 GB) already default to -p 2; on public runners
+      # (4 vCPU/16 GB) it trades wall time for headroom -- override race-args
+      # to drop it.
+      # -count=1 is redundant next to -shuffle (which already disables result
+      # caching), but stays so overrides built by editing this string and
+      # dropping -shuffle keep the guard against golang/go#74873 (stale merged
+      # coverage on cached -coverpkg runs, fixed in Go 1.27).
       - name: Test with race detector and coverage
         run: |
           read -ra args <<< "${RACE_ARGS}"
-          go test -p 2 "${args[@]}" -coverprofile=coverage.out -covermode=atomic
+          go test "${args[@]}" -coverprofile=coverage.out -covermode=atomic
         shell: bash
         env:
           RACE_ARGS: ${{ inputs.race-args }}

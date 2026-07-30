@@ -88,8 +88,10 @@ It owns the canonical `go test` flags — `-shuffle=on` everywhere, `-race` and
 `-coverpkg` in the dedicated job — so adding a flag once applies it to every
 consumer that does not override them. **`test-args` and `race-args` replace the
 defaults wholesale rather than appending**, so a caller passing
-`test-args: "-run TestFoo ./..."` silently loses `-shuffle=on`. Prefer `skip`
-over narrowing the args.
+`test-args: "-run TestFoo ./..."` silently loses `-shuffle=on`, and a
+`race-args` override drops the default `-p 2` (which bounds memory for
+race-instrumented binaries) unless it re-adds it. Prefer `skip` over narrowing
+the args.
 
 *   `os` and `go-versions` are JSON arrays. An empty `go-versions` entry falls
     back to `go-version-file`, so `'["", "stable"]'` tests the pinned toolchain
