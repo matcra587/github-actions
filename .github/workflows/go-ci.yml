@@ -301,11 +301,15 @@ jobs:
         env:
           TEST_ARGS: ${{ inputs.test-args }}
 
+  # Draft PRs skip this job (the check passes on push events, where the
+  # draft field is absent). Callers must list ready_for_review in their
+  # pull_request trigger types so flipping the draft re-runs it.
   cross-compile:
     name: cross-compile
     if: >-
       ${{ inputs.cross-compile-targets != '[]'
-      && !contains(format(' {0} ', inputs.skip), ' cross-compile ') }}
+      && !contains(format(' {0} ', inputs.skip), ' cross-compile ')
+      && github.event.pull_request.draft != true }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: validate
@@ -385,9 +389,14 @@ jobs:
           CGO_ENABLED: "0"
           TARGETS: ${{ inputs.cross-compile-targets }}
 
+  # Draft PRs skip this job (the check passes on push events, where the
+  # draft field is absent). Callers must list ready_for_review in their
+  # pull_request trigger types so flipping the draft re-runs it.
   race:
     name: race
-    if: ${{ !contains(format(' {0} ', inputs.skip), ' race ') }}
+    if: >-
+      ${{ !contains(format(' {0} ', inputs.skip), ' race ')
+      && github.event.pull_request.draft != true }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     needs: validate

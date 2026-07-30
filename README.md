@@ -128,6 +128,9 @@ the args.
     module lives outside the root. `go-version-file` stays root-relative, so
     point it at the same module's `go.mod`. This repo self-tests `go-ci.yml`
     against `tests/fixture-module` this way, via `go-ci-selftest.yml`.
+*   Draft pull requests skip the `race` and `cross-compile` jobs. List
+    `ready_for_review` in the caller's `pull_request` trigger types (as in the
+    snippet below) so marking a PR ready re-runs them; pushes are unaffected.
 
 To force a check off, pass `skip` — a space-separated list (a single line;
 newline-separated entries fail validation) of `deps`, `lint`, `tidy`,
@@ -168,6 +171,7 @@ that check on older toolchains.
 ```yaml
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [main]
 
