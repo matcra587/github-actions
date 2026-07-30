@@ -93,32 +93,56 @@ jobs:
     timeout-minutes: 5
     permissions: {}
     steps:
-      - name: Verify skip entries
-        run: |
-          allowed="deps lint tidy modernize test race cross-compile"
-          # The job gates match ' name ' with single spaces; any other whitespace
-          # would pass this validation yet skip nothing.
-          case "${SKIP}" in
-            *$'\n'* | *$'\t'* | *$'\r'*)
-              echo "::error::skip must be a single space-separated line; newline/tab entries are never matched by the job gates."
-              exit 1
-              ;;
-          esac
-          unknown=""
-          for name in ${SKIP}; do
-            case " ${allowed} " in
-              *" ${name} "*) ;;
-              *) unknown="${unknown}${unknown:+, }${name}" ;;
-            esac
-          done
-          if [ -n "${unknown}" ]; then
-            echo "::error::Unknown skip entries: ${unknown}. Allowed: $(echo "${allowed}" | tr ' ' ',' | sed 's/,/, /g')."
-            exit 1
-          fi
-          echo "skip entries valid: ${SKIP:-(none)}"
-        shell: bash
+      # Bad matrix inputs (malformed JSON, an empty required axis) die at
+      # matrix expansion with GitHub's opaque "Unexpected value" -- this step
+      # turns them into named errors first. github-script over shell:
+      # JSON.parse mirrors fromJSON(), and matches security.yml's style.
+      # setFailed does not stop the script, so every bad input reports at once.
+      - name: Validate inputs
+        # clover: provider=auto constraint=minor tags=github-script
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           SKIP: ${{ inputs.skip }}
+          OS: ${{ inputs.os }}
+          GO_VERSIONS: ${{ inputs.go-versions }}
+          TARGETS: ${{ inputs.cross-compile-targets }}
+        with:
+          script: |
+            const check = (name, raw, { nonEmpty, entryPattern, entryProblem } = {}) => {
+              let value;
+              try { value = JSON.parse(raw); } catch {}
+              if (!Array.isArray(value) || !value.every((entry) => typeof entry === 'string')) {
+                core.setFailed(`${name} must be a JSON array of strings (got: ${raw})`);
+                return;
+              }
+              if (nonEmpty && value.length === 0) {
+                core.setFailed(`${name} must not be empty -- an empty matrix axis fails at expansion`);
+                return;
+              }
+              if (entryPattern && !value.every((entry) => entryPattern.test(entry))) {
+                core.setFailed(`${name} ${entryProblem} (got: ${raw})`);
+              }
+            };
+            // The job gates match ' name ' with single spaces; any other
+            // whitespace would pass validation yet skip nothing.
+            const allowed = ['deps', 'lint', 'tidy', 'modernize', 'test', 'race', 'cross-compile'];
+            if (/[\t\n\r]/.test(process.env.SKIP)) {
+              core.setFailed('skip must be a single space-separated line; newline/tab entries are never matched by the job gates.');
+            } else {
+              const unknown = process.env.SKIP.split(' ').filter(Boolean)
+                .filter((name) => !allowed.includes(name));
+              if (unknown.length > 0) {
+                core.setFailed(`Unknown skip entries: ${unknown.join(', ')}. Allowed: ${allowed.join(', ')}.`);
+              }
+            }
+            check('os', process.env.OS, { nonEmpty: true });
+            check('go-versions', process.env.GO_VERSIONS, { nonEmpty: true });
+            // An empty targets array is valid: it disables the job.
+            check('cross-compile-targets', process.env.TARGETS, {
+              entryPattern: /^[a-z0-9]+\/[a-z0-9]+$/,
+              entryProblem: 'entries must be goos/goarch pairs',
+            });
+            if (!process.exitCode) core.info('all inputs valid');
 
   lint:
     name: lint
