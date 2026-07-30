@@ -122,6 +122,9 @@ the args.
     consequence: a `go-versions` entry older than `go.mod`'s `go` line fails
     loudly rather than silently upgrading itself, and `"stable"` is a duplicate
     cell whenever the pinned version already is stable.
+*   `working-directory` runs the Go jobs in a subdirectory, for repos whose
+    module lives outside the root. `go-version-file` stays root-relative, so
+    point it at the same module's `go.mod`.
 
 To force a check off, pass `skip` — a space-separated list (a single line;
 newline-separated entries fail validation) of `deps`, `lint`, `tidy`,

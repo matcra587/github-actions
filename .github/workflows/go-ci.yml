@@ -8,6 +8,14 @@ on:
         description: File to read the primary Go version from.
         type: string
         default: go.mod
+      working-directory:
+        description: >-
+          Directory the Go jobs run in, relative to the repository root, for
+          repos whose module lives outside the root. go-version-file stays
+          root-relative -- point it at the same module's go.mod (e.g.
+          tools/go.mod).
+        type: string
+        default: "."
       go-versions:
         description: >-
           JSON array of Go versions for the test matrix. An empty string entry
@@ -125,6 +133,9 @@ jobs:
       contents: read
     env:
       GOPRIVATE: ${{ inputs.goprivate }}
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
     steps:
       - name: Checkout
         # clover: provider=auto constraint=minor tags=checkout,github
@@ -158,6 +169,11 @@ jobs:
         with:
           go-version-file: ${{ inputs.go-version-file }}
           cache: true
+          # go.mod fallback: a zero-dependency module has no go.sum, and an
+          # unmatched pattern makes setup-go warn and skip caching entirely.
+          cache-dependency-path: |
+            **/go.sum
+            **/go.mod
 
       # Order matters: `verify` only checks modules already in the local cache,
       # so it is a no-op before `download` on a cold runner.
@@ -177,6 +193,7 @@ jobs:
           version: ${{ inputs.golangci-version }}
           args: --timeout=${{ inputs.timeout }}
           problem-matchers: true
+          working-directory: ${{ inputs.working-directory != '.' && inputs.working-directory || '' }}
 
       # The action leaves golangci-lint on PATH; `run` alone does not apply the
       # formatters section. Gated on deps: a broken module download would only
@@ -223,6 +240,7 @@ jobs:
     defaults:
       run:
         shell: bash
+        working-directory: ${{ inputs.working-directory }}
     steps:
       - name: Checkout
         # clover: provider=auto constraint=minor tags=checkout,github
@@ -257,7 +275,15 @@ jobs:
           # go-version wins when set; an empty matrix entry falls back to the file.
           go-version: ${{ matrix.go }}
           go-version-file: ${{ inputs.go-version-file }}
+          # Partial matrix versions like "1.25" resolve to the newest patch
+          # release, not the runner image's possibly stale copy.
+          check-latest: true
           cache: true
+          # go.mod fallback: a zero-dependency module has no go.sum, and an
+          # unmatched pattern makes setup-go warn and skip caching entirely.
+          cache-dependency-path: |
+            **/go.sum
+            **/go.mod
 
       - name: Download and verify deps
         if: ${{ !contains(format(' {0} ', inputs.skip), ' deps ') }}
@@ -287,6 +313,9 @@ jobs:
       contents: read
     env:
       GOPRIVATE: ${{ inputs.goprivate }}
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
     steps:
       - name: Checkout
         # clover: provider=auto constraint=minor tags=checkout,github
@@ -320,6 +349,11 @@ jobs:
         with:
           go-version-file: ${{ inputs.go-version-file }}
           cache: true
+          # go.mod fallback: a zero-dependency module has no go.sum, and an
+          # unmatched pattern makes setup-go warn and skip caching entirely.
+          cache-dependency-path: |
+            **/go.sum
+            **/go.mod
 
       # `go vet` too: `go build` does not typecheck _test.go for the target.
       - name: Build and vet each target
@@ -359,6 +393,9 @@ jobs:
     env:
       CGO_ENABLED: "1"
       GOPRIVATE: ${{ inputs.goprivate }}
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
     steps:
       - name: Checkout
         # clover: provider=auto constraint=minor tags=checkout,github
@@ -392,6 +429,11 @@ jobs:
         with:
           go-version-file: ${{ inputs.go-version-file }}
           cache: true
+          # go.mod fallback: a zero-dependency module has no go.sum, and an
+          # unmatched pattern makes setup-go warn and skip caching entirely.
+          cache-dependency-path: |
+            **/go.sum
+            **/go.mod
 
       - name: Download and verify deps
         if: ${{ !contains(format(' {0} ', inputs.skip), ' deps ') }}
@@ -444,15 +486,31 @@ jobs:
           TOTAL: ${{ steps.coverage.outputs.total }}
           THRESHOLD: ${{ inputs.coverage-threshold }}
 
+      # Artifact names cannot contain '/' and collide across two go-ci calls
+      # in the same run (upload-artifact fails on duplicate names), so
+      # multi-module callers get a per-directory suffix automatically.
+      - name: Compute coverage artifact name
+        id: artifact
+        if: ${{ !cancelled() }}
+        run: |
+          if [ "${WD}" = "." ]; then
+            echo "name=coverage" >>"${GITHUB_OUTPUT}"
+          else
+            echo "name=coverage-${WD//\//-}" >>"${GITHUB_OUTPUT}"
+          fi
+        shell: bash
+        env:
+          WD: ${{ inputs.working-directory }}
+
       - name: Upload coverage
         if: ${{ !cancelled() }}
         # clover: provider=auto constraint=minor tags=upload-artifact,github
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: coverage
+          name: ${{ steps.artifact.outputs.name }}
           path: |
-            coverage.out
-            coverage.html
+            ${{ inputs.working-directory }}/coverage.out
+            ${{ inputs.working-directory }}/coverage.html
           retention-days: 7
 
   # The single check branch protection should require: matrix legs produce
