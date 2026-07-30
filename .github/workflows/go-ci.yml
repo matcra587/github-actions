@@ -61,9 +61,9 @@ on:
         default: ""
       skip:
         description: >-
-          Jobs and checks to skip, whitespace-separated. Entries are verified
-          -- unknown names fail the workflow. Allowed values are deps, lint,
-          tidy, modernize, test, race, and cross-compile.
+          Jobs and checks to skip, space-separated (a single line). Entries
+          are verified -- unknown names fail the workflow. Allowed values are
+          deps, lint, tidy, modernize, test, race, and cross-compile.
         type: string
         default: ""
     secrets:
@@ -85,6 +85,14 @@ jobs:
       - name: Verify skip entries
         run: |
           allowed="deps lint tidy modernize test race cross-compile"
+          # The job gates match ' name ' with single spaces; any other whitespace
+          # would pass this validation yet skip nothing.
+          case "${SKIP}" in
+            *$'\n'* | *$'\t'* | *$'\r'*)
+              echo "::error::skip must be a single space-separated line; newline/tab entries are never matched by the job gates."
+              exit 1
+              ;;
+          esac
           unknown=""
           for name in ${SKIP}; do
             case " ${allowed} " in
