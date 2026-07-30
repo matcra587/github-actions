@@ -242,6 +242,15 @@ jobs:
         shell: bash
         working-directory: ${{ inputs.working-directory }}
     steps:
+      # Windows runner images ship git with core.autocrlf=true, which
+      # converts LF to CRLF at checkout and breaks golden files and
+      # formatter diffs. Must run before checkout -- and the job's default
+      # working-directory does not exist yet, so pin this step to the
+      # workspace root.
+      - name: Force LF line endings
+        run: git config --global core.autocrlf input
+        working-directory: .
+
       - name: Checkout
         # clover: provider=auto constraint=minor tags=checkout,github
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
