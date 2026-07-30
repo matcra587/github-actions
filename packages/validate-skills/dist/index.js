@@ -1587,7 +1587,11 @@ var require_request = __commonJS((exports, module) => {
         } else if (typeof val[i] === "object") {
           throw new InvalidArgumentError(`invalid ${key} header`);
         } else {
-          arr.push(`${val[i]}`);
+          const str = `${val[i]}`;
+          if (!isValidHeaderValue(str)) {
+            throw new InvalidArgumentError(`invalid ${key} header`);
+          }
+          arr.push(str);
         }
       }
       val = arr;
@@ -1599,6 +1603,9 @@ var require_request = __commonJS((exports, module) => {
       val = "";
     } else {
       val = `${val}`;
+      if (!isValidHeaderValue(val)) {
+        throw new InvalidArgumentError(`invalid ${key} header`);
+      }
     }
     if (headerName === "host") {
       if (request.host !== null) {
@@ -4977,6 +4984,7 @@ var require_client_h1 = __commonJS((exports, module) => {
     RequestContentLengthMismatchError,
     ResponseContentLengthMismatchError,
     RequestAbortedError,
+    InvalidArgumentError,
     HeadersTimeoutError,
     HeadersOverflowError,
     SocketError,
@@ -5698,8 +5706,16 @@ var require_client_h1 = __commonJS((exports, module) => {
       }
       body = bodyStream.stream;
       contentLength = bodyStream.length;
-    } else if (util2.isBlobLike(body) && request.contentType == null && body.type) {
-      headers.push("content-type", body.type);
+    } else if (util2.isBlobLike(body) && request.contentType == null) {
+      const contentType = body.type;
+      if (contentType) {
+        const contentTypeValue = `${contentType}`;
+        if (!util2.isValidHeaderValue(contentTypeValue)) {
+          util2.errorRequest(client, request, new InvalidArgumentError("invalid content-type header"));
+          return false;
+        }
+        headers.push("content-type", contentTypeValue);
+      }
     }
     if (body && typeof body.read === "function") {
       body.read(0);
@@ -8156,6 +8172,24 @@ var require_retry_handler = __commonJS((exports, module) => {
     const current = Date.now();
     return new Date(retryAfter).getTime() - current;
   }
+  function validatePartialResponseContentLength(headers, range, statusCode, retryCount) {
+    const contentLength = headers["content-length"];
+    if (contentLength == null) {
+      return null;
+    }
+    if (!Number.isFinite(range.start) || !Number.isFinite(range.end)) {
+      return null;
+    }
+    const length = Number(contentLength);
+    const expectedLength = range.end - range.start + 1;
+    if (!Number.isFinite(length) || length !== expectedLength) {
+      return new RequestRetryError("Content-Length mismatch", statusCode, {
+        headers,
+        data: { count: retryCount }
+      });
+    }
+    return null;
+  }
 
   class RetryHandler {
     constructor(opts, handlers) {
@@ -8310,6 +8344,11 @@ var require_retry_handler = __commonJS((exports, module) => {
           }));
           return false;
         }
+        const contentLengthError = validatePartialResponseContentLength(headers, contentRange, statusCode, this.retryCount);
+        if (contentLengthError != null) {
+          this.abort(contentLengthError);
+          return false;
+        }
         const { start, size, end = size - 1 } = contentRange;
         assert2(this.start === start, "content-range mismatch");
         assert2(this.end == null || this.end === end, "content-range mismatch");
@@ -8321,6 +8360,11 @@ var require_retry_handler = __commonJS((exports, module) => {
           const range = parseRangeHeader(headers["content-range"]);
           if (range == null) {
             return this.handler.onHeaders(statusCode, rawHeaders, resume, statusMessage);
+          }
+          const contentLengthError = validatePartialResponseContentLength(headers, range, statusCode, this.retryCount);
+          if (contentLengthError != null) {
+            this.abort(contentLengthError);
+            return false;
           }
           const { start, size, end = size - 1 } = range;
           assert2(start != null && Number.isFinite(start), "content-range mismatch");
@@ -14604,13 +14648,45 @@ var require_util6 = __commonJS((exports, module) => {
   function validateCookiePath(path) {
     for (let i = 0;i < path.length; ++i) {
       const code = path.charCodeAt(i);
-      if (code < 32 || code === 127 || code === 59) {
+      if (code < 32 || code > 126 || code === 59) {
         throw new Error("Invalid cookie path");
       }
     }
   }
+  function isLetterOrDigit(code) {
+    return code >= 48 && code <= 57 || code >= 65 && code <= 90 || code >= 97 && code <= 122;
+  }
   function validateCookieDomain(domain) {
-    if (domain.startsWith("-") || domain.endsWith(".") || domain.endsWith("-")) {
+    if (domain === " ") {
+      return;
+    }
+    if (domain.length > 255) {
+      throw new Error("Invalid cookie domain");
+    }
+    let labelLength = 0;
+    for (let i = 0;i < domain.length; ++i) {
+      const code = domain.charCodeAt(i);
+      if (code === 46) {
+        if (labelLength === 0) {
+          throw new Error("Invalid cookie domain");
+        }
+        if (domain.charCodeAt(i - 1) === 45) {
+          throw new Error("Invalid cookie domain");
+        }
+        labelLength = 0;
+        continue;
+      }
+      if (labelLength === 0 && !isLetterOrDigit(code)) {
+        throw new Error("Invalid cookie domain");
+      }
+      if (!isLetterOrDigit(code) && code !== 45) {
+        throw new Error("Invalid cookie domain");
+      }
+      if (++labelLength > 63) {
+        throw new Error("Invalid cookie domain");
+      }
+    }
+    if (labelLength === 0 || domain.charCodeAt(domain.length - 1) === 45) {
       throw new Error("Invalid cookie domain");
     }
   }
@@ -14693,7 +14769,11 @@ var require_util6 = __commonJS((exports, module) => {
         throw new Error("Invalid unparsed");
       }
       const [key, ...value] = part.split("=");
-      out.push(`${key.trim()}=${value.join("=")}`);
+      const trimmedKey = key.trim();
+      const joinedValue = value.join("=");
+      validateCookieName(trimmedKey);
+      validateCookieValue(joinedValue);
+      out.push(`${trimmedKey}=${joinedValue}`);
     }
     return out.join("; ");
   }
