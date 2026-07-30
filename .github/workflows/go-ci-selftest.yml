@@ -1,0 +1,48 @@
+---
+# Self-test for go-ci.yml: runs the in-branch workflow against a committed
+# fixture module (tests/fixture-module), so workflow changes are exercised
+# on the pull request before the fleet consumes them. The second job
+# exercises the skip path.
+name: go-ci-selftest
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/go-ci.yml"
+      - ".github/workflows/go-ci-selftest.yml"
+      - "tests/fixture-module/**"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/go-ci.yml"
+      - ".github/workflows/go-ci-selftest.yml"
+      - "tests/fixture-module/**"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  defaults:
+    name: Defaults
+    uses: ./.github/workflows/go-ci.yml
+    permissions:
+      contents: read
+    with:
+      working-directory: tests/fixture-module
+      go-version-file: tests/fixture-module/go.mod
+      coverage-threshold: 60
+      cross-compile-targets: '["windows/amd64", "darwin/arm64"]'
+
+  skips:
+    name: Skips
+    uses: ./.github/workflows/go-ci.yml
+    permissions:
+      contents: read
+    with:
+      working-directory: tests/fixture-module
+      go-version-file: tests/fixture-module/go.mod
+      skip: "race cross-compile"

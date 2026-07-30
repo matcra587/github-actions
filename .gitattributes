@@ -1,1 +1,4 @@
 packages/*/dist/** linguist-generated=true
+# CI fixture, not project code -- keeps linguist stats (and security.yml's
+# language-gated jobs) clean.
+tests/fixture-module/** linguist-vendored=true

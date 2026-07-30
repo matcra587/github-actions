@@ -124,7 +124,8 @@ the args.
     cell whenever the pinned version already is stable.
 *   `working-directory` runs the Go jobs in a subdirectory, for repos whose
     module lives outside the root. `go-version-file` stays root-relative, so
-    point it at the same module's `go.mod`.
+    point it at the same module's `go.mod`. This repo self-tests `go-ci.yml`
+    against `tests/fixture-module` this way, via `go-ci-selftest.yml`.
 
 To force a check off, pass `skip` — a space-separated list (a single line;
 newline-separated entries fail validation) of `deps`, `lint`, `tidy`,
