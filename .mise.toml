@@ -16,7 +16,7 @@ rumdl = "0.2.34"
 # clover: provider=auto constraint=minor tags=shellcheck
 shellcheck = "0.11.0"
 # clover: provider=auto constraint=minor tags=zizmor
-zizmor = "1.27.0"
+zizmor = "1.28.0"
 
 [env]
 HK_MISE = 1
