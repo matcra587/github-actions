@@ -111,10 +111,12 @@ the args.
     from `.golangci.yml` when migrating rather than running both. Repos that
     already ran the linter should see close to nothing; repos that didn't will
     have a backlog to clear with `go fix ./...` first.
-*   `cross-compile-targets` runs `go build` **and** `go vet` for each
-    `GOOS/GOARCH` pair, so a broken target surfaces on the PR rather than at
-    release (`vet` because `build` alone does not typecheck `_test.go` files for
-    the target). Caveat: it verifies a plain `CGO_ENABLED=0 go build`, **not**
+*   `cross-compile-targets` runs `go build`, `go vet`, and a link-only
+    `go test -exec=true` for each `GOOS/GOARCH` pair, so a broken target
+    surfaces on the PR rather than at release (`vet` because `build` alone
+    does not typecheck `_test.go` files for the target; `-exec=true` because
+    `vet` never links — test binaries are built and linked with execution
+    stubbed out). Caveat: it verifies a plain `CGO_ENABLED=0 go build`, **not**
     the GoReleaser build that actually ships, so release-only flags or tags can
     still break at tag time.
 *   `setup-go` exports `GOTOOLCHAIN=local`, so a `go` or `toolchain` directive

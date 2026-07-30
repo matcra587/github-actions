@@ -356,7 +356,10 @@ jobs:
             **/go.mod
 
       # `go vet` too: `go build` does not typecheck _test.go for the target.
-      - name: Build and vet each target
+      # `go test -exec=true` closes the remaining gap: vet typechecks but
+      # never links, so this compiles AND links each test binary for the
+      # target, with execution stubbed out by `true`.
+      - name: Build, vet, and link tests for each target
         run: |
           failed=""
           while IFS= read -r target; do
@@ -365,7 +368,7 @@ jobs:
             GOARCH="${target##*/}"
             export GOOS GOARCH
             echo "::group::${GOOS}/${GOARCH}"
-            if go build ./... && go vet ./...; then
+            if go build ./... && go vet ./... && go test -exec=true ./...; then
               echo "ok"
             else
               echo "::error::cross-compile failed for ${GOOS}/${GOARCH}"
