@@ -27,6 +27,6 @@ jobs:
 
       - name: Run rumdl
         # clover: provider=auto constraint=minor tags=rumdl
-        uses: rvben/rumdl@460ba739bf72499fcc237a99c571a9116f23b205 # v0.2.34
+        uses: rvben/rumdl@d4b387e11401873129035f3ed1ade1395ef09632 # v0.2.43
         with:
           report-type: ${{ inputs.report-type }}
