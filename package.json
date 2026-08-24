@@ -27,16 +27,16 @@
     "quality:fix": "biome check --write ."
   },
   "overrides": {
-    "brace-expansion": "5.0.8",
+    "brace-expansion": "5.0.9",
     "undici": "6.28.0"
   },
   "devDependencies": {
     "@actions/artifact": "6.2.1",
-    "@actions/cache": "6.0.1",
+    "@actions/cache": "6.2.0",
     "@actions/core": "3.0.1",
     "@actions/github": "9.1.1",
-    "@biomejs/biome": "2.5.4",
+    "@biomejs/biome": "2.5.7",
     "@github/local-action": "7.0.1",
-    "tsx": "4.22.4"
+    "tsx": "4.23.11"
   }
 }
