@@ -1,21 +1,21 @@
 [tools]
-# clover: provider=auto constraint=minor tags=actionlint
+# @clover: constraint=major tags=actionlint
 actionlint = "1.7.12"
-# clover: provider=github id=biome repository=biomejs/biome constraint=minor tag-prefix=@biomejs/biome@ tags=biome
+# @clover: id=biome constraint=major tag-prefix=@biomejs/biome@ tags=biome
 biome = "2.5.4"
-# clover: provider=auto id=bun constraint=minor tags=bun
+# @clover: id=bun constraint=major tags=bun
 bun = "1.3.14"
-# clover: provider=auto id=hk constraint=minor tags=hk
+# @clover: id=hk constraint=major tags=hk
 hk = "1.51.0"
-# clover: provider=auto constraint=minor tags=node
+# @clover: constraint=major tags=node
 node = "26.5.0"
-# clover: provider=auto constraint=minor tags=pkl
+# @clover: constraint=major tags=pkl
 pkl = "0.32.0"
-# clover: provider=auto constraint=minor tags=rumdl
+# @clover: constraint=major tags=rumdl
 rumdl = "0.2.34"
-# clover: provider=auto constraint=minor tags=shellcheck
+# @clover: constraint=major tags=shellcheck
 shellcheck = "0.11.0"
-# clover: provider=auto constraint=minor tags=zizmor
+# @clover: id=zizmor constraint=major tags=zizmor
 zizmor = "1.28.0"
 
 [env]

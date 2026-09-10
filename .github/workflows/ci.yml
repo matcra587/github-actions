@@ -19,16 +19,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        # clover: provider=auto constraint=minor tags=checkout
+        # @clover: constraint=major tags=checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 1
           persist-credentials: false
 
       - name: Install mise
-        # clover: provider=auto constraint=minor tags=mise-action
+        # @clover: constraint=major tags=mise-action
         uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
         with:
+          # clover: provider=github repository=jdx/mise constraint=major tags=mise
           version: 2026.4.28
           github_token: ${{ github.token }}
 

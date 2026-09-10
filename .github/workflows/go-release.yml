@@ -35,6 +35,7 @@ on:
       goreleaser-version:
         description: GoReleaser version to release with.
         type: string
+        # clover: provider=github repository=goreleaser/goreleaser constraint=major tags=goreleaser
         default: v2.17.0
       environment:
         description: Deployment environment for the release job.
@@ -76,7 +77,7 @@ jobs:
         shell: bash
 
       - name: Checkout
-        # clover: provider=auto constraint=minor tags=checkout
+        # @clover: constraint=major tags=checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # The previous-tag lookup and commit list need full history + tags.
@@ -104,7 +105,7 @@ jobs:
       # state itself.
       - name: Await gates for tagged commit
         if: steps.release-state.outputs.exists != 'true' && inputs.gates != ''
-        # clover: provider=github repository=matcra587/github-actions tag-prefix=await-gates/ tags=actions
+        # @clover: constraint=major tag-prefix=await-gates/ tags=actions
         uses: matcra587/github-actions/packages/await-gates@2340f3f78bb0853dbef8f6d80b97dd632bb06a65 # tag=await-gates/v0.1.1
         with:
           gates: ${{ inputs.gates }}
@@ -132,7 +133,7 @@ jobs:
 
       - name: Set up Go
         if: steps.release-state.outputs.exists != 'true'
-        # clover: provider=auto constraint=minor tags=setup-go
+        # @clover: constraint=major tags=setup-go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: ${{ inputs.go-version-file }}
@@ -179,7 +180,7 @@ jobs:
 
       - name: Run GoReleaser
         if: steps.release-state.outputs.exists != 'true'
-        # clover: provider=auto constraint=minor tags=goreleaser-action
+        # @clover: constraint=major tags=goreleaser-action
         uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
         with:
           distribution: goreleaser

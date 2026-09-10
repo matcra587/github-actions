@@ -66,6 +66,7 @@ jobs:
         -color
       zizmor-inputs: ./.github/
       zizmor-persona: pedantic
+      # clover: from=zizmor tags=zizmor
       zizmor-version: "1.24.1"
 ```
 
@@ -258,6 +259,7 @@ Use the `release` workflow to publish a reviewed commit.
 
 The workflow:
 
+<!-- clover: from=bun find="Bun `<version>`" tags=bun -->
 1.  Installs Bun `1.3.13`.
 2.  Runs `bun ci` and `bun run all`.
 3.  Fails if any bundled action is missing from git or differs from the
@@ -287,3 +289,24 @@ bun run validate-skills:local
 Each action lives under `packages/<action-name>`. Add future actions, such
 as a Nix publisher, as separate packages with their own `action.yml`, source,
 tests, and bundled `dist/index.js`.
+
+## Dependency updates
+
+Clover tracks action references, workflow tool defaults, development tools, and
+package dependencies. Run it locally alongside Dependabot; major upgrades are
+allowed, and existing version range operators are preserved.
+
+```sh
+clover annotate --check
+clover lint
+clover format --check
+clover run --dry-run
+```
+
+Apply reviewed updates with `clover run`, then run `bun install`, `bun ci`, and
+`bun run all`. Commit the updated lockfile and any rebuilt action bundles with
+the dependency changes. Use `clover annotate --write` for newly introduced pins.
+
+Generated bundles, lockfiles, test fixtures, and private configuration are
+excluded from Clover scanning. Repository release versions and the `node24`
+action runtime contract are maintained separately.
