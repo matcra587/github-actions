@@ -1,42 +1,35 @@
-- provider: http
-  url: https://registry.npmjs.org/@actions/core/latest
-  extract: /"version"\s*:\s*"([^" ]+)"/
-  find: '"@actions/core": "<version>"'
+- provider: npm
+  package: '@actions/core'
+  jq: .dependencies."@actions/core"
   constraint: major
   tags: npm
-- provider: http
-  url: https://registry.npmjs.org/@actions/github/latest
-  extract: /"version"\s*:\s*"([^" ]+)"/
-  find: '"@actions/github": "<version>"'
+- provider: npm
+  package: '@actions/github'
+  jq: .dependencies."@actions/github"
   constraint: major
   tags: npm
-- provider: http
-  url: https://registry.npmjs.org/@octokit/plugin-retry/latest
-  extract: /"version"\s*:\s*"([^" ]+)"/
-  find: '"@octokit/plugin-retry": "<version>"'
+- provider: npm
+  package: '@octokit/plugin-retry'
+  jq: .dependencies."@octokit/plugin-retry"
   constraint: major
   tags: npm
-- provider: http
-  url: https://registry.npmjs.org/@octokit/plugin-throttling/latest
-  extract: /"version"\s*:\s*"([^" ]+)"/
-  find: '"@octokit/plugin-throttling": "<version>"'
+- provider: npm
+  package: '@octokit/plugin-throttling'
+  jq: .dependencies."@octokit/plugin-throttling"
   constraint: major
   tags: npm
-- provider: http
-  url: https://registry.npmjs.org/@types/bun/latest
-  extract: /"version"\s*:\s*"([^" ]+)"/
-  find: '"@types/bun": "<version>"'
+- provider: npm
+  package: '@types/bun'
+  jq: .devDependencies."@types/bun"
   constraint: major
   tags: npm
-- provider: http
-  url: https://registry.npmjs.org/@types/node
-  extract: /"version"\s*:\s*"([^" ]+)"/
-  find: '"@types/node": "<version>"'
+- provider: npm
+  package: '@types/node'
+  jq: .devDependencies."@types/node"
   constraint: major
   tags: npm
-- provider: http
-  url: https://registry.npmjs.org/typescript/latest
-  extract: /"version"\s*:\s*"([^" ]+)"/
-  find: '"typescript": "<version>"'
+- provider: npm
+  package: typescript
+  jq: .devDependencies."typescript"
   constraint: major
   tags: npm
