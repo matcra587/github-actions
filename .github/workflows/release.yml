@@ -46,16 +46,17 @@ jobs:
       contents: read # App token (minted below) handles the privileged tag/release create.
     steps:
       - name: Checkout
-        # clover: provider=auto constraint=minor tags=checkout
+        # @clover: constraint=major tags=checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
 
       - name: Install mise
-        # clover: provider=auto constraint=minor tags=mise-action
+        # @clover: constraint=major tags=mise-action
         uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
         with:
+          # clover: provider=github repository=jdx/mise constraint=major tags=mise
           version: 2026.4.28
           github_token: ${{ github.token }}
 
@@ -78,7 +79,7 @@ jobs:
 
       - name: Resolve version
         id: version
-        # clover: provider=auto constraint=minor tags=github-script
+        # @clover: constraint=major tags=github-script
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           PACKAGE: ${{ inputs.package }}
@@ -117,7 +118,7 @@ jobs:
 
       - name: Generate App token
         id: app-token
-        # clover: provider=auto constraint=minor tags=create-github-app-token
+        # @clover: constraint=major tags=create-github-app-token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
           client-id: ${{ secrets.RELEASE_APP_CLIENT_ID }}

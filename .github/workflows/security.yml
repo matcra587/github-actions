@@ -16,6 +16,7 @@ on:
       actionlint-version:
         description: actionlint version installed by mise.
         type: string
+        # clover: provider=github repository=rhysd/actionlint constraint=major tags=actionlint
         default: "1.7.12"
       mise-version:
         description: mise version used to install actionlint. Empty installs the latest release, which also satisfies any min_version in the caller repo's mise.toml.
@@ -35,6 +36,7 @@ on:
         type: string
         # 1.24.1 misparses monorepo-prefixed tag comments (homebrew/v0.1.0)
         # as a missing version; fixed by 1.27.0.
+        # clover: provider=github repository=zizmorcore/zizmor constraint=major tags=zizmor
         default: "1.28.0"
       zizmor-online-audits:
         description: Run zizmor online audits.
@@ -106,14 +108,14 @@ jobs:
       contents: read
     steps:
       - name: Checkout
-        # clover: provider=auto constraint=minor tags=checkout
+        # @clover: constraint=major tags=checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 1
           persist-credentials: false
 
       - name: Install mise
-        # clover: provider=auto constraint=minor tags=mise-action
+        # @clover: constraint=major tags=mise-action
         uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
         with:
           version: ${{ inputs.mise-version }}
@@ -143,14 +145,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        # clover: provider=auto constraint=minor tags=checkout
+        # @clover: constraint=major tags=checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 1
           persist-credentials: false
 
       - name: Run zizmor
-        # clover: provider=auto constraint=minor tags=zizmor-action
+        # @clover: constraint=major tags=zizmor-action
         uses: zizmorcore/zizmor-action@70fb788f84895a7701f5643d103d587e460b5c99 # v0.6.3
         with:
           inputs: ${{ inputs.zizmor-inputs }}
@@ -194,7 +196,7 @@ jobs:
     steps:
       - name: Validate skip list and query linguist
         id: linguist
-        # clover: provider=auto constraint=minor tags=github-script
+        # @clover: constraint=major tags=github-script
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           SKIP: ${{ inputs.skip }}
@@ -251,7 +253,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        # clover: provider=auto constraint=minor tags=checkout
+        # @clover: constraint=major tags=checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 1
@@ -263,7 +265,7 @@ jobs:
       # govulncheck needs a module at the configured path.
       - name: Run govulncheck
         if: hashFiles(inputs.go-version-file) != ''
-        # clover: provider=auto constraint=minor tags=govulncheck-action
+        # @clover: constraint=major tags=govulncheck-action
         uses: golang/govulncheck-action@032d45514ae346b1db93c04b0c90b841c370344f # v1.1.0
         with:
           repo-checkout: false
@@ -274,7 +276,7 @@ jobs:
       # on findings, so the text pass above still owns failing the job.
       - name: Run govulncheck (SARIF)
         if: ${{ !cancelled() && hashFiles(inputs.go-version-file) != '' && needs.context.outputs.sarif-effective == 'true' }}
-        # clover: provider=auto constraint=minor tags=govulncheck-action
+        # @clover: constraint=major tags=govulncheck-action
         uses: golang/govulncheck-action@032d45514ae346b1db93c04b0c90b841c370344f # v1.1.0
         with:
           repo-checkout: false
@@ -285,7 +287,7 @@ jobs:
 
       - name: Upload SARIF to code scanning
         if: ${{ !cancelled() && hashFiles(inputs.go-version-file) != '' && needs.context.outputs.sarif-effective == 'true' }}
-        # clover: provider=auto constraint=minor tags=codeql-action
+        # @clover: constraint=major tags=codeql-action
         uses: github/codeql-action/upload-sarif@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
         with:
           sarif_file: govulncheck.sarif
@@ -304,7 +306,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout
-        # clover: provider=auto constraint=minor tags=checkout
+        # @clover: constraint=major tags=checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 1
@@ -314,7 +316,7 @@ jobs:
       # are JavaScript/TypeScript per linguist but not Bun-managed skip here.
       - name: Install Bun
         if: hashFiles('bun.lock', 'bun.lockb') != ''
-        # clover: provider=auto constraint=minor tags=setup-bun
+        # @clover: constraint=major tags=setup-bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: ${{ inputs.bun-version }}
@@ -337,7 +339,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        # clover: provider=auto constraint=minor tags=checkout
+        # @clover: constraint=major tags=checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 1
@@ -347,7 +349,7 @@ jobs:
       # but not uv-managed skip here.
       - name: Install uv
         if: hashFiles('uv.lock') != ''
-        # clover: provider=auto constraint=minor tags=setup-uv
+        # @clover: constraint=major tags=setup-uv
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           version: ${{ inputs.uv-version }}
@@ -366,7 +368,7 @@ jobs:
 
       - name: Upload SARIF to code scanning
         if: ${{ !cancelled() && hashFiles('uv.lock') != '' && needs.context.outputs.sarif-effective == 'true' }}
-        # clover: provider=auto constraint=minor tags=codeql-action
+        # @clover: constraint=major tags=codeql-action
         uses: github/codeql-action/upload-sarif@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
         with:
           sarif_file: uv-audit.sarif
@@ -390,21 +392,21 @@ jobs:
         include: ${{ fromJSON(needs.context.outputs.codeql-matrix) }}
     steps:
       - name: Checkout
-        # clover: provider=auto constraint=minor tags=checkout
+        # @clover: constraint=major tags=checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 1
           persist-credentials: false
 
       - name: Initialize CodeQL
-        # clover: provider=auto constraint=minor tags=codeql-action
+        # @clover: constraint=major tags=codeql-action
         uses: github/codeql-action/init@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
 
       - name: Analyze
-        # clover: provider=auto constraint=minor tags=codeql-action
+        # @clover: constraint=major tags=codeql-action
         uses: github/codeql-action/analyze@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
         with:
           category: codeql:${{ matrix.language }}
@@ -423,14 +425,14 @@ jobs:
       contents: read
     steps:
       - name: Checkout
-        # clover: provider=auto constraint=minor tags=checkout
+        # @clover: constraint=major tags=checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 1
           persist-credentials: false
 
       - name: Dependency review
-        # clover: provider=auto constraint=minor tags=dependency-review-action
+        # @clover: constraint=major tags=dependency-review-action
         uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
           fail-on-severity: ${{ inputs.dependency-review-fail-on-severity }}

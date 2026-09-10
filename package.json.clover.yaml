@@ -8,3 +8,51 @@
 - from: biome
   jq: .devDependencies."@biomejs/biome"
   tags: biome
+- provider: http
+  url: https://registry.npmjs.org/@actions/artifact/latest
+  extract: /"version"\s*:\s*"([^" ]+)"/
+  find: '"@actions/artifact": "<version>"'
+  constraint: major
+  tags: npm
+- provider: http
+  url: https://registry.npmjs.org/@actions/cache/latest
+  extract: /"version"\s*:\s*"([^" ]+)"/
+  find: '"@actions/cache": "<version>"'
+  constraint: major
+  tags: npm
+- provider: http
+  url: https://registry.npmjs.org/@actions/core/latest
+  extract: /"version"\s*:\s*"([^" ]+)"/
+  find: '"@actions/core": "<version>"'
+  constraint: major
+  tags: npm
+- provider: http
+  url: https://registry.npmjs.org/@actions/github/latest
+  extract: /"version"\s*:\s*"([^" ]+)"/
+  find: '"@actions/github": "<version>"'
+  constraint: major
+  tags: npm
+- provider: http
+  url: https://registry.npmjs.org/@github/local-action/latest
+  extract: /"version"\s*:\s*"([^" ]+)"/
+  find: '"@github/local-action": "<version>"'
+  constraint: major
+  tags: npm
+- provider: http
+  url: https://registry.npmjs.org/tsx/latest
+  extract: /"version"\s*:\s*"([^" ]+)"/
+  find: '"tsx": "<version>"'
+  constraint: major
+  tags: npm
+- provider: http
+  url: https://registry.npmjs.org/brace-expansion/latest
+  extract: /"version"\s*:\s*"([^" ]+)"/
+  find: '"brace-expansion": "<version>"'
+  constraint: major
+  tags: npm
+- provider: http
+  url: https://registry.npmjs.org/undici/latest
+  extract: /"version"\s*:\s*"([^" ]+)"/
+  find: '"undici": "<version>"'
+  constraint: major
+  tags: npm
