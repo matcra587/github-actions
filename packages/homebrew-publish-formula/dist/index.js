@@ -24903,7 +24903,6 @@ var require_eventsource = __commonJS(function(exports, module) {
 
 // ../../node_modules/undici/index.js
 var require_undici = __commonJS(function(exports, module) {
-  var __filename = "/tmp/matcra587-repositories-ofjc002i/public/clone-3095002837/github-actions/node_modules/undici/index.js";
   var Client = require_client();
   var Dispatcher = require_dispatcher();
   var Pool = require_pool();
@@ -25010,7 +25009,7 @@ var require_undici = __commonJS(function(exports, module) {
   exports.setGlobalDispatcher = setGlobalDispatcher;
   exports.getGlobalDispatcher = getGlobalDispatcher;
   var fetchImpl = require_fetch().fetch;
-  var currentFilename = typeof __filename !== "undefined" ? __filename : undefined;
+  var currentFilename = undefined;
   function appendFetchStackTrace(err, filename) {
     if (!err || typeof err !== "object") {
       return;

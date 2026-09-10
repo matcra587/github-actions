@@ -31873,7 +31873,6 @@ if (process.env.NODE_DEBUG && /\btunnel\b/.test(process.env.NODE_DEBUG)) {
 }
 
 // ../../node_modules/undici/index.js
-var __filename = "/tmp/matcra587-repositories-ofjc002i/public/clone-3095002837/github-actions/node_modules/undici/index.js";
 var Client = require_client();
 var Dispatcher = require_dispatcher();
 var Pool = require_pool();

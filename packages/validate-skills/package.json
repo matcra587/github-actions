@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "all": "bun run typecheck && bun run test && bun run bundle && bun run check-dist",
-    "bundle": "bun build src/index.ts --target=node --format=esm --outfile=dist/index.js",
+    "bundle": "bun build src/index.ts --target=node --format=esm --define __filename=undefined --outfile=dist/index.js",
     "check-dist": "node --check dist/index.js",
     "test": "bun test",
     "typecheck": "tsc --noEmit"
