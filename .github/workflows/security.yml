@@ -37,7 +37,7 @@ on:
         # 1.24.1 misparses monorepo-prefixed tag comments (homebrew/v0.1.0)
         # as a missing version; fixed by 1.27.0.
         # clover: provider=github repository=zizmorcore/zizmor constraint=major tags=zizmor
-        default: "1.28.0"
+        default: "1.30.1"
       zizmor-online-audits:
         description: Run zizmor online audits.
         type: boolean
@@ -153,7 +153,7 @@ jobs:
 
       - name: Run zizmor
         # @clover: constraint=major tags=zizmor-action
-        uses: zizmorcore/zizmor-action@70fb788f84895a7701f5643d103d587e460b5c99 # v0.6.3
+        uses: zizmorcore/zizmor-action@cc914d7f3750a2d13d75c7f184a1060aa0e9d482 # v0.6.4
         with:
           inputs: ${{ inputs.zizmor-inputs }}
           online-audits: ${{ inputs.zizmor-online-audits }}
@@ -288,7 +288,7 @@ jobs:
       - name: Upload SARIF to code scanning
         if: ${{ !cancelled() && hashFiles(inputs.go-version-file) != '' && needs.context.outputs.sarif-effective == 'true' }}
         # @clover: constraint=major tags=codeql-action
-        uses: github/codeql-action/upload-sarif@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
+        uses: github/codeql-action/upload-sarif@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4.38.0
         with:
           sarif_file: govulncheck.sarif
           category: govulncheck
@@ -369,7 +369,7 @@ jobs:
       - name: Upload SARIF to code scanning
         if: ${{ !cancelled() && hashFiles('uv.lock') != '' && needs.context.outputs.sarif-effective == 'true' }}
         # @clover: constraint=major tags=codeql-action
-        uses: github/codeql-action/upload-sarif@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
+        uses: github/codeql-action/upload-sarif@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4.38.0
         with:
           sarif_file: uv-audit.sarif
           category: uv-audit
@@ -400,14 +400,14 @@ jobs:
 
       - name: Initialize CodeQL
         # @clover: constraint=major tags=codeql-action
-        uses: github/codeql-action/init@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
+        uses: github/codeql-action/init@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4.38.0
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
 
       - name: Analyze
         # @clover: constraint=major tags=codeql-action
-        uses: github/codeql-action/analyze@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
+        uses: github/codeql-action/analyze@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4.38.0
         with:
           category: codeql:${{ matrix.language }}
 

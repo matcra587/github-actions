@@ -51,7 +51,7 @@ on:
           golangci-lint version. Keep in sync with the repo's .mise.toml pin.
         type: string
         # clover: provider=github repository=golangci/golangci-lint constraint=major tags=golangci-lint,github
-        default: "v2.12.2"
+        default: "v2.13.2"
       timeout:
         description: golangci-lint timeout (e.g. 5m).
         type: string
