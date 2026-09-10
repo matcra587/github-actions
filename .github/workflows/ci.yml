@@ -30,7 +30,7 @@ jobs:
         uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
         with:
           # clover: provider=github repository=jdx/mise constraint=major tags=mise
-          version: 2026.4.28
+          version: 2026.9.4
           github_token: ${{ github.token }}
 
       - name: Install dependencies
@@ -38,6 +38,11 @@ jobs:
 
       - name: Run checks
         run: bun run all
+
+      - name: Check action runtime compatibility
+        # Match the node24 runtime declared by the JavaScript actions.
+        # clover: provider=node find=node@<version> constraint=minor tags=action-runtime
+        run: mise exec node@24.21.0 -- node --test tests/node-runtime.test.mjs
 
       - name: Ensure bundled actions are committed
         # Presence first: `git diff` on a never-committed bundle is

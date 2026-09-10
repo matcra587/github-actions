@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "all": "bun run typecheck && bun run test && bun run bundle && bun run check-dist",
-    "bundle": "bun build src/index.ts --target=node --format=esm --outfile=dist/index.js",
+    "bundle": "bun build src/index.ts --target=node --format=esm --define __filename=undefined --outfile=dist/index.js",
     "check-dist": "bun build dist/index.js --target=node --format=esm --outfile=/dev/null",
     "test": "bun test",
     "typecheck": "tsc --noEmit"
@@ -17,8 +17,8 @@
     "@octokit/plugin-throttling": "11.0.5"
   },
   "devDependencies": {
-    "@types/bun": "1.4.0",
-    "@types/node": "25.9.5",
-    "typescript": "6.0.3"
+    "@types/bun": "1.4.2",
+    "@types/node": "26.5.1",
+    "typescript": "7.0.2"
   }
 }

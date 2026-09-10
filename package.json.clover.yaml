@@ -8,51 +8,43 @@
 - from: biome
   jq: .devDependencies."@biomejs/biome"
   tags: biome
-- provider: http
-  url: https://registry.npmjs.org/@actions/artifact/latest
-  extract: /"version"\s*:\s*"([^" ]+)"/
-  find: '"@actions/artifact": "<version>"'
+- provider: npm
+  package: '@actions/artifact'
+  jq: .devDependencies."@actions/artifact"
   constraint: major
   tags: npm
-- provider: http
-  url: https://registry.npmjs.org/@actions/cache/latest
-  extract: /"version"\s*:\s*"([^" ]+)"/
-  find: '"@actions/cache": "<version>"'
+- provider: npm
+  package: '@actions/cache'
+  jq: .devDependencies."@actions/cache"
   constraint: major
   tags: npm
-- provider: http
-  url: https://registry.npmjs.org/@actions/core/latest
-  extract: /"version"\s*:\s*"([^" ]+)"/
-  find: '"@actions/core": "<version>"'
+- provider: npm
+  package: '@actions/core'
+  jq: .devDependencies."@actions/core"
   constraint: major
   tags: npm
-- provider: http
-  url: https://registry.npmjs.org/@actions/github/latest
-  extract: /"version"\s*:\s*"([^" ]+)"/
-  find: '"@actions/github": "<version>"'
+- provider: npm
+  package: '@actions/github'
+  jq: .devDependencies."@actions/github"
   constraint: major
   tags: npm
-- provider: http
-  url: https://registry.npmjs.org/@github/local-action/latest
-  extract: /"version"\s*:\s*"([^" ]+)"/
-  find: '"@github/local-action": "<version>"'
+- provider: npm
+  package: '@github/local-action'
+  jq: .devDependencies."@github/local-action"
   constraint: major
   tags: npm
-- provider: http
-  url: https://registry.npmjs.org/tsx/latest
-  extract: /"version"\s*:\s*"([^" ]+)"/
-  find: '"tsx": "<version>"'
+- provider: npm
+  package: tsx
+  jq: .devDependencies."tsx"
   constraint: major
   tags: npm
-- provider: http
-  url: https://registry.npmjs.org/brace-expansion/latest
-  extract: /"version"\s*:\s*"([^" ]+)"/
-  find: '"brace-expansion": "<version>"'
+- provider: npm
+  package: brace-expansion
+  jq: .overrides."brace-expansion"
   constraint: major
   tags: npm
-- provider: http
-  url: https://registry.npmjs.org/undici/latest
-  extract: /"version"\s*:\s*"([^" ]+)"/
-  find: '"undici": "<version>"'
+- provider: npm
+  package: undici
+  jq: .overrides."undici"
   constraint: major
   tags: npm

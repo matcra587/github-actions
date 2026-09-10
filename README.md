@@ -260,7 +260,7 @@ Use the `release` workflow to publish a reviewed commit.
 The workflow:
 
 <!-- clover: from=bun find="Bun `<version>`" tags=bun -->
-1.  Installs Bun `1.3.13`.
+1.  Installs Bun `1.4.2`.
 2.  Runs `bun ci` and `bun run all`.
 3.  Fails if any bundled action is missing from git or differs from the
     committed files.

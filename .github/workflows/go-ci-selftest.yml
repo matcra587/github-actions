@@ -28,7 +28,7 @@ permissions:
 jobs:
   defaults:
     name: Defaults
-    uses: ./.github/workflows/go-ci.yml
+    uses: ./.github/workflows/go-ci.yml # zizmor: ignore[self-repository] -- Actionlint 1.7.12 rejects $/; ./ also uses the caller commit.
     permissions:
       contents: read
     with:
@@ -39,7 +39,7 @@ jobs:
 
   skips:
     name: Skips
-    uses: ./.github/workflows/go-ci.yml
+    uses: ./.github/workflows/go-ci.yml # zizmor: ignore[self-repository] -- Actionlint 1.7.12 rejects $/; ./ also uses the caller commit.
     permissions:
       contents: read
     with:
