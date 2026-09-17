@@ -44,7 +44,7 @@
     },
     "packages/security": {
       "name": "@matcra587/security-workflow",
-      "version": "0.4.2",
+      "version": "0.4.3",
     },
     "packages/validate-skills": {
       "name": "@matcra587/validate-skills-action",
