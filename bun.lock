@@ -31,7 +31,7 @@
     },
     "packages/homebrew-publish-formula": {
       "name": "@matcra587/homebrew-publish-formula-action",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "dependencies": {
         "@actions/core": "3.0.1",
         "@actions/github": "9.1.1",
