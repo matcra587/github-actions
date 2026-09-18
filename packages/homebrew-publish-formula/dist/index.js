@@ -30328,7 +30328,6 @@ function isSupportedArch(value) {
 }
 
 // src/render.ts
-var VERSION_TOKEN = "VERSION";
 var BIN_TOKEN = "BIN";
 function renderFormula(options) {
   validateFormulaOptions(options);
@@ -30337,7 +30336,6 @@ function renderFormula(options) {
     `class ${className} < Formula`,
     `  desc ${rubyString(options.desc)}`,
     `  homepage ${rubyString(options.homepage)}`,
-    `  version ${rubyString(options.version)}`,
     `  license ${rubyString(options.license)}`,
     ""
   ];
@@ -30379,17 +30377,11 @@ function renderPlatformBlocks(lines, options) {
         os: platform.os,
         arch: platform.arch
       });
-      const rubyArchive = archiveName(options.archiveNameTemplate, {
-        name: options.name,
-        version: VERSION_TOKEN,
-        os: platform.os,
-        arch: platform.arch
-      });
       const sha = options.checksums.get(concreteArchive);
       if (!sha) {
         throw new Error(`missing checksum for ${concreteArchive}`);
       }
-      const url = `${options.homepage}/releases/download/v${VERSION_TOKEN}/${rubyArchive}`;
+      const url = `${options.homepage}/releases/download/v${options.version}/${concreteArchive}`;
       lines.push(`    ${archBlock} do`, `      url ${rubyString(url)}`, `      sha256 ${rubyString(sha)}`, "    end");
     }
     lines.push("  end", "");
@@ -30432,7 +30424,7 @@ function homebrewArchBlock(arch) {
   return homebrewArchBlocks[arch];
 }
 function rubyString(value) {
-  return JSON.stringify(value).replaceAll("#{", "\\#{").replaceAll(VERSION_TOKEN, "#{version}").replaceAll(BIN_TOKEN, "#{bin}");
+  return JSON.stringify(value).replaceAll("#{", "\\#{").replaceAll(BIN_TOKEN, "#{bin}");
 }
 
 // src/main.ts

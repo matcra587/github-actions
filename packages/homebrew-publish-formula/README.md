@@ -1,7 +1,8 @@
 # homebrew-publish-formula
 
 Render and publish a Homebrew formula from GoReleaser archives and a
-`checksums.txt` file. The action runs on `node24` from `dist/index.js`.
+`checksums.txt` file. Archive URLs contain the concrete release version so
+Homebrew infers it without a redundant `version` stanza. The action runs on `node24` from `dist/index.js`.
 
 ## Basic usage
 

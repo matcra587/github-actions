@@ -9,10 +9,8 @@ import {
 
 type HomebrewArchBlock = (typeof homebrewArchBlocks)[SupportedArch]
 
-// Private-use-area sentinels survive JSON.stringify intact and won't appear
-// in real input, so rubyString can escape every literal #{ while still
-// emitting the deliberate #{version}/#{bin} interpolations we need.
-const VERSION_TOKEN = '\u{E000}VERSION\u{E000}'
+// A sentinel preserves the deliberate #{bin} interpolation while rubyString
+// escapes interpolation in user-supplied values.
 const BIN_TOKEN = '\u{E000}BIN\u{E000}'
 
 export interface FormulaOptions {
@@ -45,7 +43,6 @@ export function renderFormula(options: FormulaOptions): string {
     `class ${className} < Formula`,
     `  desc ${rubyString(options.desc)}`,
     `  homepage ${rubyString(options.homepage)}`,
-    `  version ${rubyString(options.version)}`,
     `  license ${rubyString(options.license)}`,
     '',
   ]
@@ -119,18 +116,12 @@ function renderPlatformBlocks(lines: string[], options: FormulaOptions): void {
         os: platform.os,
         arch: platform.arch,
       })
-      const rubyArchive = archiveName(options.archiveNameTemplate, {
-        name: options.name,
-        version: VERSION_TOKEN,
-        os: platform.os,
-        arch: platform.arch,
-      })
       const sha = options.checksums.get(concreteArchive)
       if (!sha) {
         throw new Error(`missing checksum for ${concreteArchive}`)
       }
 
-      const url = `${options.homepage}/releases/download/v${VERSION_TOKEN}/${rubyArchive}`
+      const url = `${options.homepage}/releases/download/v${options.version}/${concreteArchive}`
       lines.push(
         `    ${archBlock} do`,
         `      url ${rubyString(url)}`,
@@ -202,6 +193,5 @@ function homebrewArchBlock(arch: SupportedArch): HomebrewArchBlock {
 function rubyString(value: string): string {
   return JSON.stringify(value)
     .replaceAll('#{', '\\#{')
-    .replaceAll(VERSION_TOKEN, '#{version}')
     .replaceAll(BIN_TOKEN, '#{bin}')
 }
