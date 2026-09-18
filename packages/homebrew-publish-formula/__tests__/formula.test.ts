@@ -64,8 +64,13 @@ describe('formula renderer', () => {
     })
 
     expect(formula).toContain('class Peerscout < Formula')
+    expect(formula).not.toContain('\n  version ')
+    expect(formula).not.toContain('#{version}')
+    for (const platform of ['darwin_arm64', 'linux_amd64', 'linux_arm64']) {
+      expect(formula).toContain(`v0.4.1/peerscout_0.4.1_${platform}.tar.gz`)
+    }
     expect(formula).toContain(
-      'url "https://github.com/matcra587/peerscout/releases/download/v#{version}/peerscout_#{version}_darwin_arm64.tar.gz"',
+      'url "https://github.com/matcra587/peerscout/releases/download/v0.4.1/peerscout_0.4.1_darwin_arm64.tar.gz"',
     )
     expect(formula).toContain(
       'sha256 "16297728580c674a7ef806bd1fd2a2cce3b0527ada00677a8f7545a87572c344"',
@@ -139,9 +144,9 @@ describe('formula renderer', () => {
 
     // Hostile #{...} in a literal field is neutralised...
     expect(formula).toContain('desc "evil \\#{1 + 1} desc"')
-    // ...but the URL still emits a real Ruby #{version} interpolation.
+    // ...while archive URLs use the concrete release version.
     expect(formula).toContain(
-      'url "https://github.com/matcra587/peerscout/releases/download/v#{version}/peerscout_#{version}_darwin_arm64.tar.gz"',
+      'url "https://github.com/matcra587/peerscout/releases/download/v0.4.1/peerscout_0.4.1_darwin_arm64.tar.gz"',
     )
     // And the test block still emits a real #{bin} interpolation.
     expect(formula).toContain(
