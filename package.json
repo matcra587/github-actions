@@ -35,7 +35,7 @@
     "@actions/cache": "6.2.0",
     "@actions/core": "3.0.1",
     "@actions/github": "9.1.1",
-    "@biomejs/biome": "2.5.12",
+    "@biomejs/biome": "2.5.13",
     "@github/local-action": "7.0.1",
     "tsx": "4.23.13"
   }
