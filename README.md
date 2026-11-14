@@ -12,6 +12,14 @@ Shared GitHub Actions for `matcra587` repositories.
 *   [`await-gates`](packages/await-gates/README.md) —
   Wait for named workflow gates to pass for a commit (composite; used by
   release workflows to gate tag publishes on the tagged commit's CI).
+*   [`run-clover`](packages/run-clover/README.md) —
+  Run gechr/clover in the repository that the job checks out. Resolve pinned
+  version strings. Then open update pull requests. Or examine directives
+  with `lint` (composite action, used with `setup-clover`).
+*   [`setup-clover`](packages/setup-clover/README.md) —
+  Install a gechr/clover release on the runner PATH after a checksum check
+  (composite action, install only — used with `run-clover` or run `clover`
+  directly).
 *   [`homebrew-publish-formula`](packages/homebrew-publish-formula/README.md) —
   Render and publish a Homebrew formula from GoReleaser archives.
 *   [`validate-skills`](packages/validate-skills/README.md) —
@@ -267,8 +275,9 @@ The workflow:
 4.  Creates an immutable version tag and GitHub release for the selected commit.
 
 Versions are recorded per kind. Actions are npm packages and carry their own
-`packages/<name>/package.json`. Reusable workflows are not packages, so theirs
-live in `.github/workflow-versions.json` — bump the version there, then dispatch
+`packages/<name>/package.json`. Reusable workflows and composite actions are
+not packages, so theirs live in `.github/workflow-versions.json` — bump the
+version there, then dispatch
 the release. `security.yml` predates this and still uses a `package.json`
 anchor; it moves separately.
 

@@ -1,0 +1,82 @@
+name: clover-selftest
+
+on:
+  pull_request:
+    paths:
+      - "packages/setup-clover/**"
+      - "packages/run-clover/**"
+      - ".github/workflows/clover-selftest.yml"
+  push:
+    branches: [main]
+    paths:
+      - "packages/setup-clover/**"
+      - "packages/run-clover/**"
+      - ".github/workflows/clover-selftest.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Clover lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        # @clover: constraint=major tags=checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up clover
+        # Actionlint 1.7.12 does not accept $/. ./ uses the caller commit.
+        uses: ./packages/setup-clover # zizmor: ignore[self-repository]
+        with:
+          # clover: provider=github repository=gechr/clover constraint=major tags=clover
+          version: "0.4.10"
+          # act does not resolve composite input defaults that use the
+          # github context. GitHub resolves them. Pass the token here for
+          # local act runs.
+          token: ${{ github.token }}
+
+      - name: Check clover directives through the action
+        # Actionlint 1.7.12 does not accept $/. ./ uses the caller commit.
+        uses: ./packages/run-clover # zizmor: ignore[self-repository]
+        with:
+          version: "0.4.10"
+          command: lint
+
+  dry-run:
+    name: Clover dry-run
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        # @clover: constraint=major tags=checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up clover
+        # Actionlint 1.7.12 does not accept $/. ./ uses the caller commit.
+        uses: ./packages/setup-clover # zizmor: ignore[self-repository]
+        with:
+          # clover: provider=github repository=gechr/clover constraint=major tags=clover
+          version: "0.4.10"
+          # act does not resolve composite input defaults that use the
+          # github context. GitHub resolves them. Pass the token here for
+          # local act runs.
+          token: ${{ github.token }}
+
+      - name: Resolve updates through the action
+        # Actionlint 1.7.12 does not accept $/. ./ uses the caller commit.
+        uses: ./packages/run-clover # zizmor: ignore[self-repository]
+        with:
+          version: "0.4.10"
+          command: run
+          args: --dry-run

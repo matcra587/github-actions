@@ -1,0 +1,175 @@
+name: setup-clover
+description: >-
+  Install a gechr/clover release on the runner PATH. The action downloads
+  the release archive. It checks the archive against the release checksums.
+  It puts the clover binary on the runner PATH for later steps and actions.
+author: matcra587
+
+branding:
+  icon: download
+  color: green
+
+inputs:
+  version:
+    description: >-
+      Clover release version to install. Write it with or without the
+      leading v (for example "0.4.10"). Pin one exact version.
+    required: true
+  token:
+    description: >-
+      Token for the release download and the attestation check.
+    required: false
+    default: ${{ github.token }}
+  attest:
+    description: >-
+      Also verify the archive with `gh attestation verify`. Clover releases
+      have no artifact attestations yet. The check fails until upstream
+      publishes them.
+    required: false
+    default: "false"
+
+outputs:
+  bin:
+    description: Absolute path of the installed clover binary.
+    value: ${{ steps.install.outputs.bin }}
+  version:
+    description: The clover release tag that the action installed.
+    value: ${{ steps.install.outputs.version }}
+
+runs:
+  using: composite
+  steps:
+    - name: Resolve platform
+      id: platform
+      shell: bash
+      run: |
+        set -euo pipefail
+        case "${RUNNER_OS}" in
+          Linux)   os=linux ;;
+          macOS)   os=darwin ;;
+          Windows) os=windows ;;
+          *)
+            echo "Unsupported runner OS: ${RUNNER_OS}" >&2
+            exit 1
+            ;;
+        esac
+        case "${RUNNER_ARCH}" in
+          X64)   arch=amd64 ;;
+          ARM64) arch=arm64 ;;
+          *)
+            echo "Unsupported runner architecture: ${RUNNER_ARCH}" >&2
+            exit 1
+            ;;
+        esac
+        if [ "${os}" = "windows" ]; then
+          echo "asset=clover_${os}_${arch}.zip" >> "${GITHUB_OUTPUT}"
+        else
+          echo "asset=clover_${os}_${arch}.tar.gz" >> "${GITHUB_OUTPUT}"
+        fi
+
+    - name: Download release
+      # @clover: constraint=major tags=github-script
+      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+      env:
+        CLOVER_VERSION: ${{ inputs.version }}
+        CLOVER_ASSET: ${{ steps.platform.outputs.asset }}
+      with:
+        github-token: ${{ inputs.token }}
+        script: |
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const dir = path.join(process.env.RUNNER_TEMP, 'clover-install');
+          fs.mkdirSync(dir, { recursive: true });
+          const tag = `v${process.env.CLOVER_VERSION.replace(/^v/, '')}`;
+          const assetName = process.env.CLOVER_ASSET;
+          const release = await github.rest.repos.getReleaseByTag({
+            owner: 'gechr',
+            repo: 'clover',
+            tag,
+          });
+          const assets = new Map(release.data.assets.map((asset) => [asset.name, asset]));
+          for (const name of [assetName, 'checksums.txt']) {
+            const asset = assets.get(name);
+            if (!asset) {
+              core.setFailed(`Release ${tag} has no asset ${name}; published assets: ${[...assets.keys()].join(', ')}`);
+              return;
+            }
+            const download = await github.rest.repos.getReleaseAsset({
+              owner: 'gechr',
+              repo: 'clover',
+              asset_id: asset.id,
+              headers: { accept: 'application/octet-stream' },
+            });
+            fs.writeFileSync(path.join(dir, name), Buffer.from(download.data));
+            core.info(`Downloaded ${name} (${asset.size} bytes)`);
+          }
+
+    - name: Verify checksum
+      id: checksum
+      # @clover: constraint=major tags=github-script
+      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+      env:
+        CLOVER_ASSET: ${{ steps.platform.outputs.asset }}
+      with:
+        script: |
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const crypto = require('node:crypto');
+          const dir = path.join(process.env.RUNNER_TEMP, 'clover-install');
+          const asset = process.env.CLOVER_ASSET;
+          const entry = fs.readFileSync(path.join(dir, 'checksums.txt'), 'utf8')
+            .split('\n')
+            .find((line) => line.trimEnd().split(/\s+/)[1] === asset);
+          if (!entry) {
+            core.setFailed(`checksums.txt has no entry for ${asset}`);
+            return;
+          }
+          const expected = entry.trim().split(/\s+/)[0].toLowerCase();
+          const digest = crypto.createHash('sha256')
+            .update(fs.readFileSync(path.join(dir, asset)))
+            .digest('hex');
+          if (digest !== expected) {
+            core.setFailed(`Checksum mismatch for ${asset}: expected ${expected}, got ${digest}`);
+            return;
+          }
+          core.info(`Checksum verified: ${digest}`);
+
+    - name: Verify attestation
+      if: inputs.attest == 'true'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        CLOVER_VERSION: ${{ inputs.version }}
+        CLOVER_ASSET: ${{ steps.platform.outputs.asset }}
+      run: |
+        set -euo pipefail
+        cd "${RUNNER_TEMP}/clover-install"
+        gh attestation verify "${CLOVER_ASSET}" --repo gechr/clover \
+          --cert-identity "https://github.com/gechr/clover/.github/workflows/release.yaml@refs/tags/v${CLOVER_VERSION#v}"
+
+    - name: Install
+      id: install
+      shell: bash
+      env:
+        CLOVER_VERSION: ${{ inputs.version }}
+        CLOVER_ASSET: ${{ steps.platform.outputs.asset }}
+      # zizmor: ignore[github-env] -- Later steps and actions call clover through PATH. The checksum step verified this binary.
+      run: | # zizmor: ignore[github-env]
+        set -euo pipefail
+        cd "${RUNNER_TEMP}/clover-install"
+        if [ "${RUNNER_OS}" = "Windows" ]; then
+          unzip -o "${CLOVER_ASSET}"
+        else
+          tar -xzf "${CLOVER_ASSET}"
+        fi
+        bin_dir="${RUNNER_TEMP}/clover-install/bin"
+        mkdir -p "${bin_dir}"
+        bin="clover"
+        if [ "${RUNNER_OS}" = "Windows" ]; then
+          bin="clover.exe"
+        fi
+        mv "${bin}" "${bin_dir}/"
+        echo "bin=${bin_dir}/${bin}" >> "${GITHUB_OUTPUT}"
+        echo "version=v${CLOVER_VERSION#v}" >> "${GITHUB_OUTPUT}"
+        echo "${bin_dir}" >> "${GITHUB_PATH}"
+        "${bin_dir}/${bin}" version
