@@ -27,8 +27,10 @@
     "quality:fix": "biome check --write ."
   },
   "overrides": {
-    "brace-expansion": "5.0.9",
-    "undici": "8.10.2"
+    "brace-expansion": "5.0.12",
+    "glob": "14.0.2",
+    "minimatch": "11.0.1",
+    "undici": "8.12.2"
   },
   "devDependencies": {
     "@actions/artifact": "6.2.1",
