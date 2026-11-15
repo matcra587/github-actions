@@ -44,6 +44,16 @@
   constraint: major
   tags: npm
 - provider: npm
+  package: glob
+  jq: .overrides."glob"
+  constraint: major
+  tags: npm
+- provider: npm
+  package: minimatch
+  jq: .overrides."minimatch"
+  constraint: major
+  tags: npm
+- provider: npm
   package: undici
   jq: .overrides."undici"
   constraint: major
