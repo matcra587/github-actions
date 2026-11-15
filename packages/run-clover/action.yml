@@ -1,0 +1,216 @@
+name: run-clover
+description: >-
+  Run gechr/clover in the checked-out repository. The `run` command resolves
+  pinned version strings and opens a pull request with the updates. The
+  `lint` command checks directives offline. The `format` command rewrites
+  directive comments in a standard form. The action needs `clover` on the
+  runner PATH. Install it with setup-clover first.
+author: matcra587
+
+branding:
+  icon: refresh-cw
+  color: green
+
+inputs:
+  command:
+    description: The clover command to run. Use `run`, `lint`, or `format`.
+    required: false
+    default: run
+  args:
+    description: >-
+      Extra arguments for the clover command. Example: `--dry-run`.
+    required: false
+    default: ""
+  version:
+    description: >-
+      The clover version that setup-clover installed. The action writes this
+      version in the commit message and the pull request footer. This input
+      is informational only.
+    required: false
+    default: ""
+  token:
+    description: >-
+      Token for the branch push and the pull request. The token needs
+      `contents:write` to push. Pull requests with the default GITHUB_TOKEN
+      do not start CI runs directly. Use a GitHub App token or a PAT when
+      the CI must run without approval.
+    required: false
+    default: ${{ github.token }}
+  pr-branch:
+    description: >-
+      Branch for the pull request. When an open pull request for this branch
+      exists, the action force-pushes to it. The action does not open a
+      second pull request.
+    required: false
+    default: clover/update
+  pr-base:
+    description: Base branch for the pull request.
+    required: false
+    default: ${{ github.ref_name }}
+  pr-title:
+    description: Pull request title.
+    required: false
+    default: "chore(deps): update pinned versions"
+  pr-body:
+    description: >-
+      Pull request body. The action adds a provenance footer with the clover
+      version when you set `version`.
+    required: false
+    default: >-
+      Updates version pins resolved by
+      [clover](https://github.com/gechr/clover).
+  pr-labels:
+    description: >-
+      Comma separated labels for the pull request. The labels must exist in
+      the repository. An unknown label fails the pull request creation.
+    required: false
+    default: ""
+  commit-message:
+    description: Commit message for the update.
+    required: false
+    default: "chore(deps): update pinned versions"
+
+outputs:
+  changed:
+    description: "True when the command wrote changes to the working tree."
+    value: ${{ steps.publish.outputs.changed }}
+  pr-url:
+    description: >-
+      URL of the created or updated pull request. Empty when the command
+      produced no changes. Empty for `lint`.
+    value: ${{ steps.pull-request.outputs.pr-url }}
+
+runs:
+  using: composite
+  steps:
+    - name: Check clover on PATH
+      shell: bash
+      run: |
+        set -euo pipefail
+        if ! command -v clover >/dev/null 2>&1; then
+          echo "clover is not on PATH. Run matcra587/github-actions/packages/setup-clover in an earlier step of this job." >&2
+          exit 1
+        fi
+
+    - name: Run clover
+      id: clover
+      shell: bash
+      env:
+        CLOVER_COMMAND: ${{ inputs.command }}
+        CLOVER_ARGS: ${{ inputs.args }}
+      run: |
+        set -euo pipefail
+        case "${CLOVER_COMMAND}" in
+          run | lint | format) ;;
+          *)
+            echo "command must be one of run, lint, format (got: ${CLOVER_COMMAND})" >&2
+            exit 1
+            ;;
+        esac
+        read -ra extra_args <<< "${CLOVER_ARGS}"
+        clover "${CLOVER_COMMAND}" ${extra_args[@]+"${extra_args[@]}"}
+
+    - name: Publish update branch
+      id: publish
+      if: inputs.command != 'lint'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        CLOVER_VERSION: ${{ inputs.version }}
+        CLOVER_BRANCH: ${{ inputs.pr-branch }}
+        CLOVER_MESSAGE: ${{ inputs.commit-message }}
+      run: |
+        set -euo pipefail
+
+        if [ -z "$(git status --porcelain)" ]; then
+          echo "changed=false" >> "${GITHUB_OUTPUT}"
+          echo "No version updates to publish."
+          exit 0
+        fi
+        echo "changed=true" >> "${GITHUB_OUTPUT}"
+
+        suffix=""
+        if [ -n "${CLOVER_VERSION}" ]; then
+          suffix=" [clover v${CLOVER_VERSION#v}]"
+        fi
+
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git add -A
+        git commit -m "${CLOVER_MESSAGE}${suffix}"
+
+        # The action pushes with the input token. Checkout can keep
+        # persist-credentials: false.
+        auth="$(printf 'x-access-token:%s' "${GH_TOKEN}" | base64 | tr -d '\n')"
+        git config "http.https://github.com/.extraheader" "AUTHORIZATION: basic ${auth}"
+        git push --force origin "HEAD:refs/heads/${CLOVER_BRANCH}"
+        git config --unset "http.https://github.com/.extraheader"
+
+    - name: Open pull request
+      id: pull-request
+      if: inputs.command != 'lint' && steps.publish.outputs.changed == 'true'
+      # @clover: constraint=major tags=github-script
+      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+      env:
+        CLOVER_VERSION: ${{ inputs.version }}
+        CLOVER_BRANCH: ${{ inputs.pr-branch }}
+        CLOVER_BASE: ${{ inputs.pr-base }}
+        CLOVER_TITLE: ${{ inputs.pr-title }}
+        CLOVER_BODY: ${{ inputs.pr-body }}
+        CLOVER_LABELS: ${{ inputs.pr-labels }}
+      with:
+        github-token: ${{ inputs.token }}
+        script: |
+          const { owner, repo } = context.repo;
+          const branch = process.env.CLOVER_BRANCH;
+          const base = process.env.CLOVER_BASE;
+
+          // The list filter needs the owner-qualified head. The create
+          // call does not need it.
+          const existing = await github.rest.pulls.list({
+            owner,
+            repo,
+            head: `${owner}:${branch}`,
+            base,
+            state: 'open',
+            per_page: 1,
+          });
+          if (existing.data.length > 0) {
+            const pr = existing.data[0];
+            core.info(`Pull request already open: ${pr.html_url}`);
+            core.setOutput('pr-url', pr.html_url);
+            core.setOutput('pr-number', String(pr.number));
+            return;
+          }
+
+          const version = (process.env.CLOVER_VERSION || '').replace(/^v/, '');
+          let body = process.env.CLOVER_BODY;
+          if (version) {
+            body += `\n\nGenerated with [clover v${version}](https://github.com/gechr/clover/releases/tag/v${version}) via matcra587/github-actions.`;
+          }
+
+          const created = await github.rest.pulls.create({
+            owner,
+            repo,
+            head: branch,
+            base,
+            title: process.env.CLOVER_TITLE,
+            body,
+          });
+
+          const labels = (process.env.CLOVER_LABELS || '')
+            .split(',')
+            .map((label) => label.trim())
+            .filter(Boolean);
+          if (labels.length > 0) {
+            await github.rest.issues.addLabels({
+              owner,
+              repo,
+              issue_number: created.data.number,
+              labels,
+            });
+          }
+
+          core.info(`Pull request created: ${created.data.html_url}`);
+          core.setOutput('pr-url', created.data.html_url);
+          core.setOutput('pr-number', String(created.data.number));

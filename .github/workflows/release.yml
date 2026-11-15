@@ -12,7 +12,9 @@ on:
           - await-gates
           - go-ci
           - homebrew-publish-formula
+          - run-clover
           - security
+          - setup-clover
           - validate-skills
       draft:
         description: Create the GitHub release as a draft.
