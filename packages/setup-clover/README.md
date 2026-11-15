@@ -19,18 +19,28 @@ Behavior:
 
 ## Usage
 
+The pairing with `run-clover`:
+
 ```yaml
 steps:
   - name: Checkout
     uses: actions/checkout@<reviewed-commit-sha>
 
   - name: Set up clover
-    id: setup
     uses: matcra587/github-actions/packages/setup-clover@<reviewed-commit-sha>
     with:
       version: "0.4.10"
 
-  - name: Use clover in later steps
+  - name: Check clover directives
+    uses: matcra587/github-actions/packages/run-clover@<reviewed-commit-sha>
+    with:
+      command: lint
+```
+
+Or run `clover` in your own steps:
+
+```yaml
+  - name: Lint clover directives
     run: clover lint
 ```
 
